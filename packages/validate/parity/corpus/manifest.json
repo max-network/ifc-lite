@@ -1,0 +1,230 @@
+[
+  {
+    "file": "broken/wall-userdefined-without-objecttype.ifc",
+    "targets": "IfcWall.CorrectPredefinedType"
+  },
+  {
+    "file": "broken/door-typed-by-wall-type.ifc",
+    "targets": "IfcDoor.CorrectStyleAssigned"
+  },
+  {
+    "file": "broken/window-typed-by-wall-type.ifc",
+    "targets": "IfcWindow.CorrectStyleAssigned"
+  },
+  {
+    "file": "broken/slab-userdefined-without-objecttype.ifc",
+    "targets": "IfcSlab.CorrectPredefinedType"
+  },
+  {
+    "file": "broken/space-userdefined-without-objecttype.ifc",
+    "targets": "IfcSpace.CorrectPredefinedType"
+  },
+  {
+    "file": "broken/wall-typed-by-slab-type.ifc",
+    "targets": "IfcWall.CorrectTypeAssigned"
+  },
+  {
+    "file": "broken/walltype-without-name.ifc",
+    "targets": "IfcTypeObject.NameRequired"
+  },
+  {
+    "file": "broken/storey-not-aggregated.ifc",
+    "targets": "IfcSpatialStructureElement.WR41"
+  },
+  {
+    "file": "broken/aggregates-self-reference.ifc",
+    "targets": "IfcRelAggregates.NoSelfReference"
+  },
+  {
+    "file": "broken/storey-contained-in-storey.ifc",
+    "targets": "IfcRelContainedInSpatialStructure.WR31"
+  },
+  {
+    "file": "broken/project-without-name.ifc",
+    "targets": "IfcProject.HasName"
+  },
+  {
+    "file": "broken/project-subcontext.ifc",
+    "targets": "IfcProject.CorrectContext"
+  },
+  {
+    "file": "broken/two-projects.ifc",
+    "targets": "global:IfcSingleProjectInstance"
+  },
+  {
+    "file": "broken/axis-without-refdirection.ifc",
+    "targets": "IfcAxis2Placement3D.AxisAndRefDirProvision"
+  },
+  {
+    "file": "broken/placement-location-2d.ifc",
+    "targets": "IfcAxis2Placement3D.LocationIs3D"
+  },
+  {
+    "file": "broken/placement-parallel-axes.ifc",
+    "targets": "IfcAxis2Placement3D.AxisToRefDirPosition"
+  },
+  {
+    "file": "broken/direction-zero.ifc",
+    "targets": "IfcDirection.MagnitudeGreaterZero"
+  },
+  {
+    "file": "broken/point-one-coordinate.ifc",
+    "targets": "IfcCartesianPoint.CP2Dor3D"
+  },
+  {
+    "file": "broken/extrusion-in-profile-plane.ifc",
+    "targets": "IfcExtrudedAreaSolid.ValidExtrusionDirection"
+  },
+  {
+    "file": "broken/rectangle-zero-width.ifc",
+    "targets": "IfcPositiveLengthMeasure.WR1"
+  },
+  {
+    "file": "broken/shape-without-type.ifc",
+    "targets": "IfcShapeRepresentation.HasRepresentationType"
+  },
+  {
+    "file": "broken/shape-wrong-type.ifc",
+    "targets": "IfcShapeRepresentation.CorrectItemsForType"
+  },
+  {
+    "file": "broken/shape-in-non-geometric-context.ifc",
+    "targets": "IfcShapeRepresentation.CorrectContext"
+  },
+  {
+    "file": "broken/shape-shared-by-two-products.ifc",
+    "targets": "IfcShapeModel.WR11"
+  },
+  {
+    "file": "broken/local-placement-3d-under-2d.ifc",
+    "targets": "IfcLocalPlacement.WR21"
+  },
+  {
+    "file": "broken/subcontext-userdefined-view.ifc",
+    "targets": "IfcGeometricRepresentationSubContext.UserTargetProvided"
+  },
+  {
+    "file": "broken/subcontext-explicit-derived.ifc",
+    "targets": "derived-in-subtype"
+  },
+  {
+    "file": "broken/pset-without-name.ifc",
+    "targets": "IfcPropertySet.ExistsName"
+  },
+  {
+    "file": "broken/pset-duplicate-property-names.ifc",
+    "targets": "IfcPropertySet.UniquePropertyNames"
+  },
+  {
+    "file": "broken/two-psets-same-name.ifc",
+    "targets": "IfcObject.UniquePropertySetNames"
+  },
+  {
+    "file": "broken/quantity-negative-length.ifc",
+    "targets": "IfcQuantityLength.WR22"
+  },
+  {
+    "file": "broken/unit-wrong-dimensions.ifc",
+    "targets": "IfcNamedUnit.WR1"
+  },
+  {
+    "file": "broken/unit-assignment-duplicate-type.ifc",
+    "targets": "IfcUnitAssignment.WR01"
+  },
+  {
+    "file": "broken/ownerhistory-added-without-date.ifc",
+    "targets": "IfcOwnerHistory.CorrectChangeAction"
+  },
+  {
+    "file": "broken/person-without-name.ifc",
+    "targets": "IfcPerson.IdentifiablePerson"
+  },
+  {
+    "file": "broken/grid-without-placement.ifc",
+    "targets": "IfcGrid.HasPlacement"
+  },
+  {
+    "file": "broken/grid-axis-3d-curve.ifc",
+    "targets": "IfcGridAxis.WR1"
+  },
+  {
+    "file": "broken/polyline-mixed-dimensions.ifc",
+    "targets": "IfcPolyline.SameDim"
+  },
+  {
+    "file": "broken/profile-outer-curve-3d.ifc",
+    "targets": "IfcArbitraryClosedProfileDef.WR1"
+  },
+  {
+    "file": "broken/material-priority-out-of-range.ifc",
+    "targets": "IfcMaterialLayer.NormalizedPriority"
+  },
+  {
+    "file": "broken/wallstandardcase-without-layer-usage.ifc",
+    "targets": "IfcWallStandardCase.HasMaterialLayerSetUsage"
+  },
+  {
+    "file": "broken/opening-voids-nothing.ifc",
+    "targets": "inverse-cardinality"
+  },
+  {
+    "file": "broken/door-fills-two-openings.ifc",
+    "targets": "inverse-cardinality"
+  },
+  {
+    "file": "broken/wall-contained-twice.ifc",
+    "targets": "inverse-cardinality"
+  },
+  {
+    "file": "broken/defines-by-properties-on-type.ifc",
+    "targets": "IfcRelDefinesByProperties.NoRelatedTypeObject"
+  },
+  {
+    "file": "broken/duplicate-globalid.ifc",
+    "targets": "IfcRoot.UR1"
+  },
+  {
+    "file": "broken/globalid-invalid-characters.ifc",
+    "targets": "guid-format"
+  },
+  {
+    "file": "broken/wall-missing-globalid.ifc",
+    "targets": "not-optional"
+  },
+  {
+    "file": "broken/wall-name-integer.ifc",
+    "targets": "invalid-type"
+  },
+  {
+    "file": "broken/wall-placement-wrong-entity.ifc",
+    "targets": "invalid-type"
+  },
+  {
+    "file": "broken/point-integer-coordinates.ifc",
+    "targets": "invalid-type"
+  },
+  {
+    "file": "broken/wall-enum-unknown-item.ifc",
+    "targets": "invalid-type"
+  },
+  {
+    "file": "broken/wall-attribute-count.ifc",
+    "targets": "attribute-count"
+  },
+  {
+    "file": "broken/abstract-entity-instance.ifc",
+    "targets": "abstract"
+  },
+  {
+    "file": "broken/select-untyped-value.ifc",
+    "targets": "invalid-type"
+  },
+  {
+    "file": "broken/typed-value-in-plain-slot.ifc",
+    "targets": "invalid-type"
+  },
+  {
+    "file": "broken/header-author-not-list.ifc",
+    "targets": "FILE_NAME.author"
+  }
+]
