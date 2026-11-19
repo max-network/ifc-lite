@@ -47,7 +47,8 @@ ifc-lite ships its public npm packages under the `@ifc-lite/*` scope, plus the `
 | [`@ifc-lite/server-client`](#ifc-liteserver-client) | TypeScript client SDK for IFC-Lite Server |
 | [`@ifc-lite/server-bin`](#ifc-liteserver-bin) | Pre-built IFC-Lite server binary - run without Docker or Rust |
 | [`@ifc-lite/wasm`](#ifc-litewasm) | WebAssembly bindings for IFC-Lite |
-| [`@ifc-lite/codegen`](#ifc-litecodegen) | TypeScript code generator from IFC EXPRESS schemas |
+| [`@ifc-lite/codegen`](#ifc-litecodegen) | TypeScript, Rust and validator code generator from IFC EXPRESS schemas |
+| [`@ifc-lite/validate`](#ifc-litevalidate) | IFC schema validation generated from the EXPRESS schemas: WHERE, UNIQUE, INVERSE and global rules plus zod schemas |
 | [`create-ifc-lite`](#create-ifc-lite) | Create IFC-Lite projects with one command |
 | [`@ifc-lite/ai`](https://www.npmjs.com/package/@ifc-lite/ai) | Provider-independent AI request core: transport contract, typed outcomes, root budgets, usage receipts and bounded JSON output parsing |
 | [`@ifc-lite/bcf-api`](https://www.npmjs.com/package/@ifc-lite/bcf-api) | BCF API (OpenCDE) REST client for connecting to BCF servers |
@@ -1221,7 +1222,11 @@ before passing their typed projections to the raw fingerprint bindings.
 
 ## @ifc-lite/codegen
 
-TypeScript code generator from IFC EXPRESS schemas. Produces the 876-entity type definitions, CRC32 type ids, serializers, and the parser's generated Rust tables (`generateTypeIds`, `generateSerializers`, `generateRust`). Primarily a build-time tool, not used at runtime.
+TypeScript code generator from IFC EXPRESS schemas. Produces the 876-entity type definitions, CRC32 type ids, serializers, and the parser's generated Rust tables (`generateTypeIds`, `generateSerializers`, `generateRust`). `generateValidators` (CLI `--validators <dir>`) compiles the schema's WHERE, UNIQUE, DERIVE and INVERSE clauses, FUNCTIONs and global RULEs to TypeScript plus zod schemas for `@ifc-lite/validate`. Primarily a build-time tool, not used at runtime.
+
+## @ifc-lite/validate
+
+IFC validation generated from the EXPRESS schemas of IFC2X3, IFC4 and IFC4X3: schema checks, defined-type and entity WHERE rules, UNIQUE, INVERSE and global rules, with structured findings (`validateDataStore`, `validateStepText`) and zod schemas per entity (`@ifc-lite/validate/ifc4/zod`). No Node built-ins at runtime, so it runs in browsers and Workers. See the package README for its parity report against ifcopenshell.validate.
 
 ## create-ifc-lite
 
