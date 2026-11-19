@@ -6,6 +6,7 @@
  */
 
 import type { LineCategory, VisibilityState } from './line-classification.js';
+import type { PlanLabel, PlanSymbol } from './plan/plan-types.js';
 
 // VECTOR TYPES
 // ═══════════════════════════════════════════════════════════════════════════
@@ -130,9 +131,7 @@ export type { LineCategory, VisibilityState };
 // DRAWING ELEMENTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-/**
- * A classified line segment in the 2D drawing
- */
+/** A classified line segment in the 2D drawing */
 export interface DrawingLine {
   /** 2D line geometry */
   line: Line2D;
@@ -164,9 +163,7 @@ export interface DrawingLine {
   depthEnd?: number;
 }
 
-/**
- * A polygon from section cut (used for hatching)
- */
+/** A polygon from section cut (used for hatching) */
 export interface DrawingPolygon {
   /** 2D polygon geometry */
   polygon: Polygon2D;
@@ -295,7 +292,9 @@ export interface Drawing2D {
 
   /** Projection polygons (visible surfaces beyond cut) */
   projectionPolygons: DrawingPolygon[];
-
+  /** Plan symbols (door swings, window frames, room boundaries) and labels; set by `generateStoreyPlan`. */
+  planSymbols?: PlanSymbol[];
+  planLabels?: PlanLabel[];
   /** Bounding box in 2D drawing space */
   bounds: Bounds2D;
 
