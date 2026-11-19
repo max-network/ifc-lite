@@ -12,6 +12,7 @@ import { Model, type StepRecordSource } from './runtime/model.js';
 import type { SchemaRuntime } from './runtime/schema-runtime.js';
 import type { ValidationReport } from './engine/findings.js';
 import { validateModel, type ValidateOptions } from './engine/validate.js';
+import { validateStepTextWith } from './step-text.js';
 
 export { validateModel, type ValidateOptions } from './engine/validate.js';
 export type { FindingCategory, NotEvaluated, SchemaCheck, ValidationFinding, ValidationReport } from './engine/findings.js';
@@ -55,8 +56,7 @@ export interface ValidateInput extends ValidateOptions {
 
 /** Validate an IFC-SPF (STEP) text. */
 export async function validateStepText(text: string, options: ValidateInput = {}): Promise<ValidationReport> {
-  const schema = await schemaOrThrow(fileSchemaIdentifier(text), options.schema);
-  return validateModel(Model.fromStepText(text, schema), { headerText: text, ...options });
+  return validateStepTextWith(await schemaOrThrow(fileSchemaIdentifier(text), options.schema), text, options);
 }
 
 export interface DataStoreLike extends StepRecordSource {
