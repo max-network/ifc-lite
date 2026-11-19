@@ -24,7 +24,11 @@ export function tarballNameFromPackOutput(stdout) {
         JSON.stringify(String(stdout).slice(0, 120)),
     );
   }
-  const filename = Array.isArray(entries) ? entries[0]?.filename : undefined;
+  // npm 12 keys the entries by package name instead of returning an array.
+  const first = Array.isArray(entries)
+    ? entries[0]
+    : entries && typeof entries === 'object' ? Object.values(entries)[0] : undefined;
+  const filename = first?.filename;
   if (typeof filename !== 'string' || filename === '') {
     throw new Error(
       'npm pack --json returned no filename. Output began: ' +

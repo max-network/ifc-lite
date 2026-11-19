@@ -60,6 +60,20 @@ test('reads the filename from npm 11 --json output', () => {
   assert.equal(tarballNameFromPackOutput(NPM_11_JSON), 'ifc-lite-wasm-4.7.0.tgz');
 });
 
+const NPM_12_JSON = `{
+  "@ifc-lite/wasm": {
+    "id": "@ifc-lite/wasm@12.3.0",
+    "name": "@ifc-lite/wasm",
+    "version": "12.3.0",
+    "filename": "ifc-lite-wasm-12.3.0.tgz",
+    "entryCount": 6
+  }
+}`;
+
+test('reads the filename from npm 12 --json output, keyed by package name', () => {
+  assert.equal(tarballNameFromPackOutput(NPM_12_JSON), 'ifc-lite-wasm-12.3.0.tgz');
+});
+
 test('refuses the human notice block instead of guessing a path from it', () => {
   // The point of the whole change: this input must not silently produce
   // something tar will choke on later.
@@ -72,6 +86,7 @@ test('refuses the human notice block instead of guessing a path from it', () => 
 test('refuses a well-formed response that carries no filename', () => {
   assert.throws(() => tarballNameFromPackOutput('[{"name":"@ifc-lite/wasm"}]'), /no filename/);
   assert.throws(() => tarballNameFromPackOutput('[]'), /no filename/);
+  assert.throws(() => tarballNameFromPackOutput('{}'), /no filename/);
 });
 
 test('names the offending output in the error, truncated', () => {
