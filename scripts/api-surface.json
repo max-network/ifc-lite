@@ -13970,7 +13970,6 @@
     "interval: function",
     "isAggregate: function",
     "isIn: function",
-    "isLogical: function",
     "isSet: function",
     "isTrue: function",
     "le: function",
