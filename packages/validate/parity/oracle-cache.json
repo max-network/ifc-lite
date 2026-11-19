@@ -682,14 +682,14 @@
    ]
   },
   "packages/validate/parity/corpus/broken/abstract-entity-instance.ifc": {
-   "sha256": "b82ed38c347a6b992413860a032b83a26ffabf673e1618e9749a82c4183f748c",
+   "sha256": "d5e1c34a08022c3fdebd61f2e3b90c5a4fde97ff69eb484aa0b80f51c1e557e6",
    "findings": [
     {
      "type": "schema",
      "instance": 138,
-     "instanceText": "#138=IfcBuildingElement('2xxxxxxxxxxxxxxxxxxxxU',#5,'Abstract',$,$,$,$,$)",
+     "instanceText": "#138=IfcElement('2xxxxxxxxxxxxxxxxxxxxU',#5,'Abstract',$,$,$,$,$)",
      "attribute": null,
-     "message": "Entity IfcBuildingElement is abstract"
+     "message": "Entity IfcElement is abstract"
     }
    ]
   },
@@ -2065,6 +2065,770 @@
      "instanceText": "#63=IfcLocalPlacement(#50,#14)",
      "attribute": "IfcLocalPlacement.WR21",
      "message": "IfcCorrectLocalPlacement(relativeplacement, placementrelto)\n\nViolated by:\n    False\n     +  where False = IfcCorrectLocalPlacement(#14=IfcAxis2Placement3D(#11,#12,#13), #50=IfcLocalPlacement(#30,#33))\n\nOn instance:\n    #63=IfcLocalPlacement(#50,#14)\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/base.ifc": {
+   "sha256": "0a459dcbb3d7c12e144cd6e8ebd114e6fd4528eb51f148d20eb74f40a9131bfc",
+   "findings": []
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/wall-userdefined-without-objecttype.ifc": {
+   "sha256": "29b4fcc4c0a76a359792b98732bc2a9de65cb301f13b7bc46387a3c75ada5394",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 42,
+     "instanceText": "#42=IfcWall('2xxxxxxxxxxxxxxxxxxxx8',#5,'Wall A',$,$,#30,#41,$,.USERDEFINED.)",
+     "attribute": "IfcWall.CorrectPredefinedType",
+     "message": "(not exists(predefinedtype) or predefinedtype != IfcWallTypeEnum.USERDEFINED or (predefinedtype == IfcWallTypeEnum.USERDEFINED and exists(SELF.ObjectType)))\n\nViolated by:\n    ((not True or 'USERDEFINED' != 'USERDEFINED' or ('USERDEFINED' == 'USERDEFINED' and False)))\n     +  where True = exists('USERDEFINED')\n     +  and   'USERDEFINED' = IfcWallTypeEnum.USERDEFINED\n     +  and   'USERDEFINED' = I"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/door-typed-by-wall-type.ifc": {
+   "sha256": "8900a9b3b2269ad6e54e7035a17c1add8dc806e1ebb7bdc3e38393b36ab29c70",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 62,
+     "instanceText": "#62=IfcDoor('2xxxxxxxxxxxxxxxxxxxxF',#5,'Door',$,$,#63,$,$,2.1,1.,.DOOR.,.SINGLE_SWING_LEFT.,$)",
+     "attribute": "IfcDoor.CorrectTypeAssigned",
+     "message": "(sizeof(istypedby) == 0 or 'ifc4x3_add2.ifcdoortype' in typeof(SELF.IsTypedBy[1].RelatingType))\n\nViolated by:\n    ((1 == 0 or 'ifc4x3_add2.ifcdoortype' in {'ifc4x3_add2.ifcobjectdefinition', 'ifc4x3_add2.ifcroot', 'ifc4x3_add2.ifcwalltype', 'ifc4x3_add2.ifcelementtype', 'ifc4x3_add2.ifcbuiltelementtype', 'ifc4x3_add2.ifctypeproduct', 'ifc4x3_add2.ifctypeobject'}))\n     +  where 1 = sizeof((#49=Ifc"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/window-typed-by-wall-type.ifc": {
+   "sha256": "80adb5f447db9db6106c79f6a3dcb99d722f8ff6f66d96750c0956d5210347d7",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 73,
+     "instanceText": "#73=IfcWindow('2xxxxxxxxxxxxxxxxxxxxJ',#5,'Window',$,$,#74,$,$,1.2,1.,.WINDOW.,.SINGLE_PANEL.,$)",
+     "attribute": "IfcWindow.CorrectTypeAssigned",
+     "message": "(sizeof(istypedby) == 0 or 'ifc4x3_add2.ifcwindowtype' in typeof(SELF.IsTypedBy[1].RelatingType))\n\nViolated by:\n    ((1 == 0 or 'ifc4x3_add2.ifcwindowtype' in {'ifc4x3_add2.ifcobjectdefinition', 'ifc4x3_add2.ifcroot', 'ifc4x3_add2.ifcwalltype', 'ifc4x3_add2.ifcelementtype', 'ifc4x3_add2.ifcbuiltelementtype', 'ifc4x3_add2.ifctypeproduct', 'ifc4x3_add2.ifctypeobject'}))\n     +  where 1 = sizeof((#49"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/slab-userdefined-without-objecttype.ifc": {
+   "sha256": "7188a00efc8cb0b06d9c0f95f8bf91cc475bddae30530de75c523b074338e466",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 88,
+     "instanceText": "#88=IfcSlab('2xxxxxxxxxxxxxxxxxxxxL',#5,'Slab',$,$,#87,#86,$,.USERDEFINED.)",
+     "attribute": "IfcSlab.CorrectPredefinedType",
+     "message": "(not exists(predefinedtype) or predefinedtype != IfcSlabTypeEnum.USERDEFINED or (predefinedtype == IfcSlabTypeEnum.USERDEFINED and exists(SELF.ObjectType)))\n\nViolated by:\n    ((not True or 'USERDEFINED' != 'USERDEFINED' or ('USERDEFINED' == 'USERDEFINED' and False)))\n     +  where True = exists('USERDEFINED')\n     +  and   'USERDEFINED' = IfcSlabTypeEnum.USERDEFINED\n     +  and   'USERDEFINED' = I"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/space-userdefined-without-objecttype.ifc": {
+   "sha256": "e5d549686afcd02cbab5eb7ac377fa1ed0f81909db83d66c86e5750424b132b8",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 101,
+     "instanceText": "#101=IfcSpace('2xxxxxxxxxxxxxxxxxxxxM',#5,'Room 1',$,$,#100,#86,'Living',.ELEMENT.,.USERDEFINED.,$)",
+     "attribute": "IfcSpace.CorrectPredefinedType",
+     "message": "(not exists(predefinedtype) or predefinedtype != IfcSpaceTypeEnum.USERDEFINED or (predefinedtype == IfcSpaceTypeEnum.USERDEFINED and exists(SELF.ObjectType)))\n\nViolated by:\n    ((not True or 'USERDEFINED' != 'USERDEFINED' or ('USERDEFINED' == 'USERDEFINED' and False)))\n     +  where True = exists('USERDEFINED')\n     +  and   'USERDEFINED' = IfcSpaceTypeEnum.USERDEFINED\n     +  and   'USERDEFINED' "
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/wall-typed-by-slab-type.ifc": {
+   "sha256": "bb1ca85ccfd75f34327cb461182aff9d4ca3b3b2e746b1f7d4c20e66c074dfa7",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 42,
+     "instanceText": "#42=IfcWall('2xxxxxxxxxxxxxxxxxxxx8',#5,'Wall A',$,$,#30,#41,$,.STANDARD.)",
+     "attribute": "IfcWall.CorrectTypeAssigned",
+     "message": "(sizeof(istypedby) == 0 or 'ifc4x3_add2.ifcwalltype' in typeof(SELF.IsTypedBy[1].RelatingType))\n\nViolated by:\n    ((1 == 0 or 'ifc4x3_add2.ifcwalltype' in {'ifc4x3_add2.ifcobjectdefinition', 'ifc4x3_add2.ifcroot', 'ifc4x3_add2.ifcelementtype', 'ifc4x3_add2.ifcslabtype', 'ifc4x3_add2.ifcbuiltelementtype', 'ifc4x3_add2.ifctypeproduct', 'ifc4x3_add2.ifctypeobject'}))\n     +  where 1 = sizeof((#49=Ifc"
+    },
+    {
+     "type": "entity_rule",
+     "instance": 60,
+     "instanceText": "#60=IfcWallStandardCase('2xxxxxxxxxxxxxxxxxxxxD',#5,'Wall B',$,$,#90,#91,$,.STANDARD.)",
+     "attribute": "IfcWall.CorrectTypeAssigned",
+     "message": "(sizeof(istypedby) == 0 or 'ifc4x3_add2.ifcwalltype' in typeof(SELF.IsTypedBy[1].RelatingType))\n\nViolated by:\n    ((1 == 0 or 'ifc4x3_add2.ifcwalltype' in {'ifc4x3_add2.ifcobjectdefinition', 'ifc4x3_add2.ifcroot', 'ifc4x3_add2.ifcelementtype', 'ifc4x3_add2.ifcslabtype', 'ifc4x3_add2.ifcbuiltelementtype', 'ifc4x3_add2.ifctypeproduct', 'ifc4x3_add2.ifctypeobject'}))\n     +  where 1 = sizeof((#49=Ifc"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/walltype-without-name.ifc": {
+   "sha256": "ca723eb4d08733833bc8c465f9f139853a229067120ff72cb87c4bf99ac968f6",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 48,
+     "instanceText": "#48=IfcWallType('2xxxxxxxxxxxxxxxxxxxxA',#5,$,$,$,$,$,$,$,.STANDARD.)",
+     "attribute": "IfcTypeObject.NameRequired",
+     "message": "exists(SELF.Name)\n\nViolated by:\n    False\n     +  where False = exists(<indeterminate_type object at 0x0000026633714950>)\n     +    where <indeterminate_type object at 0x0000026633714950> = #48=IfcWallType('2xxxxxxxxxxxxxxxxxxxxA',#5,$,$,$,$,$,$,$,.STANDARD.).Name\n\nOn instance:\n    #48=IfcWallType('2xxxxxxxxxxxxxxxxxxxxA',#5,$,$,$,$,$,$,$,.STANDARD.)\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/storey-not-aggregated.ifc": {
+   "sha256": "069886fdfd8e9b84af3a110b718663adfb5c6e6eaa7e5684b96b7b5d6a3cfa05",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 26,
+     "instanceText": "#26=IfcBuildingStorey('2xxxxxxxxxxxxxxxxxxxx4',#5,'Level 0',$,$,#25,$,$,.ELEMENT.,0.)",
+     "attribute": "IfcSpatialStructureElement.WR41",
+     "message": "(hiindex(SELF.Decomposes) == 1 and 'ifc4x3_add2.ifcrelaggregates' in typeof(SELF.Decomposes[1]) and ('ifc4x3_add2.ifcproject' in typeof(SELF.Decomposes[1].RelatingObject) or 'ifc4x3_add2.ifcspatialstructureelement' in typeof(SELF.Decomposes[1].RelatingObject)))\n\nViolated by:\n    ((0 == 1))\n     +  where 0 = hiindex(())\n     +    where () = #26=IfcBuildingStorey('2xxxxxxxxxxxxxxxxxxxx4',#5,'Level 0"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/aggregates-self-reference.ifc": {
+   "sha256": "39fe7dc0c805c2b0ed4ac55e94afb0645ba4f001b9342bfba4b3e633583299e7",
+   "findings": [
+    {
+     "type": "schema",
+     "instance": 26,
+     "instanceText": "#26=IfcBuildingStorey('2xxxxxxxxxxxxxxxxxxxx4',#5,'Level 0',$,$,#25,$,$,.ELEMENT.,0.)",
+     "attribute": "IfcBuildingStorey.Decomposes",
+     "message": "With inverse:\n    Decomposes : SET [0:1] OF IfcRelAggregates FOR RelatedObjects\nValue:\n    [\n      1. #29=IfcRelAggregates('2xxxxxxxxxxxxxxxxxxxx7',#5,$,$,#24,(#26))\n      2. #102=IfcRelAggregates('2xxxxxxxxxxxxxxxxxxxxN',#5,$,$,#26,(#101,#26))\n    ]\nNot valid\n"
+    },
+    {
+     "type": "entity_rule",
+     "instance": 102,
+     "instanceText": "#102=IfcRelAggregates('2xxxxxxxxxxxxxxxxxxxxN',#5,$,$,#26,(#101,#26))",
+     "attribute": "IfcRelAggregates.NoSelfReference",
+     "message": "(sizeof([temp for temp in relatedobjects if relatingobject == temp]) == 0)\n\nViolated by:\n    (1 == 0)\n     +  where 1 = sizeof([#26=IfcBuildingStorey('2xxxxxxxxxxxxxxxxxxxx4',#5,'Level 0',$,$,#25,$,$,.ELEMENT.,0.)])\n\nOn instance:\n    #102=IfcRelAggregates('2xxxxxxxxxxxxxxxxxxxxN',#5,$,$,#26,(#101,#26))\n"
+    },
+    {
+     "type": "entity_rule",
+     "instance": 26,
+     "instanceText": "#26=IfcBuildingStorey('2xxxxxxxxxxxxxxxxxxxx4',#5,'Level 0',$,$,#25,$,$,.ELEMENT.,0.)",
+     "attribute": "IfcSpatialStructureElement.WR41",
+     "message": "(hiindex(SELF.Decomposes) == 1 and 'ifc4x3_add2.ifcrelaggregates' in typeof(SELF.Decomposes[1]) and ('ifc4x3_add2.ifcproject' in typeof(SELF.Decomposes[1].RelatingObject) or 'ifc4x3_add2.ifcspatialstructureelement' in typeof(SELF.Decomposes[1].RelatingObject)))\n\nViolated by:\n    ((2 == 1))\n     +  where 2 = hiindex((#29=IfcRelAggregates('2xxxxxxxxxxxxxxxxxxxx7',#5,$,$,#24,(#26)), #102=IfcRelAggreg"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/storey-contained-in-storey.ifc": {
+   "sha256": "45856e562fb3e108fddced18194c689bf985b0d7fdf12452d5158d179eb15907",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 120,
+     "instanceText": "#120=IfcRelContainedInSpatialStructure('2xxxxxxxxxxxxxxxxxxxxP',#5,$,$,(#42,#60,#62,#73,#88,#119,#101),#26)",
+     "attribute": "IfcRelContainedInSpatialStructure.WR31",
+     "message": "(sizeof([temp for temp in relatedelements if 'ifc4x3_add2.ifcspatialstructureelement' in typeof(temp)]) == 0)\n\nViolated by:\n    (1 == 0)\n     +  where 1 = sizeof([#101=IfcSpace('2xxxxxxxxxxxxxxxxxxxxM',#5,'Room 1',$,$,#100,#86,'Living',.ELEMENT.,.INTERNAL.,$)])\n\nOn instance:\n    #120=IfcRelContainedInSpatialStructure('2xxxxxxxxxxxxxxxxxxxxP',#5,$,$,(#42,#60,#62,#73,#88,#119,#101),#26)\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/project-without-name.ifc": {
+   "sha256": "4da6e9cf2b92f4ff3498dd564ecf52fd3f7e7011e135861c08abc1930bcd9b79",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 20,
+     "instanceText": "#20=IfcProject('2xxxxxxxxxxxxxxxxxxxx1',#5,$,$,$,$,$,(#15),#10)",
+     "attribute": "IfcProject.HasName",
+     "message": "exists(SELF.Name)\n\nViolated by:\n    False\n     +  where False = exists(<indeterminate_type object at 0x000002663338DBD0>)\n     +    where <indeterminate_type object at 0x000002663338DBD0> = #20=IfcProject('2xxxxxxxxxxxxxxxxxxxx1',#5,$,$,$,$,$,(#15),#10).Name\n\nOn instance:\n    #20=IfcProject('2xxxxxxxxxxxxxxxxxxxx1',#5,$,$,$,$,$,(#15),#10)\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/project-subcontext.ifc": {
+   "sha256": "ad057c7f84ab70e724678711eed97f8d11bc61a292c9cf7f0c37818861d1dd41",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 20,
+     "instanceText": "#20=IfcProject('2xxxxxxxxxxxxxxxxxxxx1',#5,'Project',$,$,$,$,(#15,#16),#10)",
+     "attribute": "IfcProject.CorrectContext",
+     "message": "(not exists(SELF.RepresentationContexts) or sizeof([temp for temp in SELF.RepresentationContexts if 'ifc4x3_add2.ifcgeometricrepresentationsubcontext' in typeof(temp)]) == 0)\n\nViolated by:\n    ((not True or 1 == 0))\n     +  where True = exists((#15=IfcGeometricRepresentationContext($,'Model',3,1.E-05,#14,$), #16=IfcGeometricRepresentationSubContext('Body','Model',*,*,*,*,#15,$,.MODEL_VIEW.,$)))\n  "
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/two-projects.ifc": {
+   "sha256": "a8691b611daf77c6a0df349c75eb8e414c66545070f600d569bec805eee27e2d",
+   "findings": [
+    {
+     "type": "global_rule",
+     "instance": null,
+     "instanceText": null,
+     "attribute": "IfcSingleProjectInstance",
+     "message": "(sizeof(IfcProject) <= 1)\n\nViolated by:\n    (2 <= 1)\n     +  where 2 = sizeof((#20=IfcProject('2xxxxxxxxxxxxxxxxxxxx1',#5,'Project',$,$,$,$,(#15),#10), #138=IfcProject('2xxxxxxxxxxxxxxxxxxxxU',#5,'Second',$,$,$,$,(#15),#10)))"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/axis-without-refdirection.ifc": {
+   "sha256": "0e123d8a2da7a76cbe00d80614ac353d61ef528a52c2eb0c2b5c04b8643e0fa8",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 14,
+     "instanceText": "#14=IfcAxis2Placement3D(#11,#12,$)",
+     "attribute": "IfcAxis2Placement3D.AxisAndRefDirProvision",
+     "message": "(not exists(axis) ^ exists(refdirection))\n\nViolated by:\n    not (True ^ False)\n     +  where True = exists(#12=IfcDirection((0.,0.,1.)))\n     +  and   False = exists(<indeterminate_type object at 0x0000026639FECE10>)\n\nOn instance:\n    #14=IfcAxis2Placement3D(#11,#12,$)\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/placement-location-2d.ifc": {
+   "sha256": "1ad8a0aa0759b224a1bac71157a2cb9160d4919e5b10de3af89575883be236d9",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 92,
+     "instanceText": "#92=IfcAxis2Placement3D(#37,$,$)",
+     "attribute": "IfcAxis2Placement3D.LocationIs3D",
+     "message": "(SELF.Location.Dim == 3)\n\nViolated by:\n    (2 == 3)\n     +  where 2 = #37=IfcCartesianPoint((0.,0.)).Dim\n     +    where #37=IfcCartesianPoint((0.,0.)) = #92=IfcAxis2Placement3D(#37,$,$).Location\n\nOn instance:\n    #92=IfcAxis2Placement3D(#37,$,$)\n"
+    },
+    {
+     "type": "entity_rule",
+     "instance": 71,
+     "instanceText": "#71=IfcLocalPlacement(#90,#51)",
+     "attribute": "IfcLocalPlacement.WR21",
+     "message": "IfcCorrectLocalPlacement(relativeplacement, placementrelto)\n\nViolated by:\n    False\n     +  where False = IfcCorrectLocalPlacement(#51=IfcAxis2Placement3D(#52,$,$), #90=IfcLocalPlacement(#25,#92))\n\nOn instance:\n    #71=IfcLocalPlacement(#90,#51)\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/placement-parallel-axes.ifc": {
+   "sha256": "cdee23dae89965a923b3b708f7bef139acca542980681e6bb71b45426afaac4d",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 14,
+     "instanceText": "#14=IfcAxis2Placement3D(#11,#12,#12)",
+     "attribute": "IfcAxis2Placement3D.AxisToRefDirPosition",
+     "message": "(not exists(axis) or not exists(refdirection) or IfcCrossProduct(axis, refdirection).Magnitude > 0.0)\n\nViolated by:\n    ((not True or not True or 0.0 > 0.0))\n     +  where True = exists(#12=IfcDirection((0.,0.,1.)))\n     +  and   True = exists(#12=IfcDirection((0.,0.,1.)))\n     +  and   0.0 = #2204=IfcVector(#12,0.).Magnitude\n     +    where #2204=IfcVector(#12,0.) = IfcCrossProduct(#12=IfcDirecti"
+    },
+    {
+     "type": "entity_rule",
+     "instance": 16,
+     "instanceText": "#16=IfcGeometricRepresentationSubContext('Body','Model',*,*,*,*,#15,$,.MODEL_VIEW.,$)",
+     "attribute": "IfcGeometricRepresentationContext.North2D",
+     "message": "truenorth = SELF.TrueNorth\n\nViolated by:\n    Attribute not set\n\nOn instance:\n    #16=IfcGeometricRepresentationSubContext('Body','Model',*,*,*,*,#15,$,.MODEL_VIEW.,$)\n"
+    },
+    {
+     "type": "entity_rule",
+     "instance": 17,
+     "instanceText": "#17=IfcGeometricRepresentationSubContext('Axis','Model',*,*,*,*,#15,$,.GRAPH_VIEW.,$)",
+     "attribute": "IfcGeometricRepresentationContext.North2D",
+     "message": "truenorth = SELF.TrueNorth\n\nViolated by:\n    Attribute not set\n\nOn instance:\n    #17=IfcGeometricRepresentationSubContext('Axis','Model',*,*,*,*,#15,$,.GRAPH_VIEW.,$)\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/direction-zero.ifc": {
+   "sha256": "1c336cbc4c6ba11a7997201af2053758689cd735d32c48b1a936a1206039a006",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 32,
+     "instanceText": "#32=IfcDirection((0.,0.))",
+     "attribute": "IfcDirection.MagnitudeGreaterZero",
+     "message": "(sizeof([tmp for tmp in directionratios if tmp != 0.0]) > 0)\n\nViolated by:\n    (0 > 0)\n     +  where 0 = sizeof([])\n\nOn instance:\n    #32=IfcDirection((0.,0.))\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/point-one-coordinate.ifc": {
+   "sha256": "adac3c9021eb34a36091389135bb52ae080254cb3e6410d137d4b2f3c9a433a4",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 54,
+     "instanceText": "#54=IfcAxis2Placement2D(#55,$)",
+     "attribute": "IfcAxis2Placement2D.LocationIs2D",
+     "message": "(SELF.Location.Dim == 2)\n\nViolated by:\n    (1 == 2)\n     +  where 1 = #55=IfcCartesianPoint((0.5)).Dim\n     +    where #55=IfcCartesianPoint((0.5)) = #54=IfcAxis2Placement2D(#55,$).Location\n\nOn instance:\n    #54=IfcAxis2Placement2D(#55,$)\n"
+    },
+    {
+     "type": "entity_rule",
+     "instance": 55,
+     "instanceText": "#55=IfcCartesianPoint((0.5))",
+     "attribute": "IfcCartesianPoint.CP2Dor3D",
+     "message": "(hiindex(coordinates) >= 2)\n\nViolated by:\n    (1 >= 2)\n     +  where 1 = hiindex((0.5,))\n\nOn instance:\n    #55=IfcCartesianPoint((0.5))\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/extrusion-in-profile-plane.ifc": {
+   "sha256": "fba4d46c45ddcb20687d8238633d920aa0935337ce10e430bae310f102ab552c",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 35,
+     "instanceText": "#35=IfcExtrudedAreaSolid(#34,#14,#13,3.)",
+     "attribute": "IfcExtrudedAreaSolid.ValidExtrusionDirection",
+     "message": "(IfcDotProduct(IfcDirection(DirectionRatios=[0.0, 0.0, 1.0]), SELF.ExtrudedDirection) != 0.0)\n\nViolated by:\n    (0.0 != 0.0)\n     +  where 0.0 = IfcDotProduct(#2558=IfcDirection((0.,0.,1.)), #13=IfcDirection((1.,0.,0.)))\n     +    where #2558=IfcDirection((0.,0.,1.)) = IfcDirection(DirectionRatios=[0.0, 0.0, 1.0])\n     +    and   #13=IfcDirection((1.,0.,0.)) = #35=IfcExtrudedAreaSolid(#34,#14,#13,"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/rectangle-zero-width.ifc": {
+   "sha256": "3c7b011887ce2ae4dcac50522aac517cdea32602851830a32cec56d632d554d0",
+   "findings": [
+    {
+     "type": "simpletype_rule",
+     "instance": 34,
+     "instanceText": "#34=IfcRectangleProfileDef(.AREA.,$,#33,5.,0.)",
+     "attribute": "IfcPositiveLengthMeasure.WR1",
+     "message": "(SELF > 0.0)\n\nViolated by:\n    (0.0 > 0.0)\n\nOn instance:\n    #34=IfcRectangleProfileDef(.AREA.,$,#33,5.,0.)\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/shape-without-type.ifc": {
+   "sha256": "9d6b78477c3768f14d4a9454faa5af46125e5af6f8d966ca0a259ed545d64ad4",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 85,
+     "instanceText": "#85=IfcShapeRepresentation(#16,'Body',$,(#84))",
+     "attribute": "IfcShapeRepresentation.CorrectItemsForType",
+     "message": "IfcShapeRepresentationTypes(SELF.RepresentationType, SELF.Items)\n\nViolated by:\n    'indeterminate_type' object is not callable\n\nOn instance:\n    #85=IfcShapeRepresentation(#16,'Body',$,(#84))\n"
+    },
+    {
+     "type": "entity_rule",
+     "instance": 85,
+     "instanceText": "#85=IfcShapeRepresentation(#16,'Body',$,(#84))",
+     "attribute": "IfcShapeRepresentation.HasRepresentationType",
+     "message": "exists(SELF.RepresentationType)\n\nViolated by:\n    False\n     +  where False = exists(<indeterminate_type object at 0x0000026634DBEAD0>)\n     +    where <indeterminate_type object at 0x0000026634DBEAD0> = #85=IfcShapeRepresentation(#16,'Body',$,(#84)).RepresentationType\n\nOn instance:\n    #85=IfcShapeRepresentation(#16,'Body',$,(#84))\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/shape-wrong-type.ifc": {
+   "sha256": "7f23dc46a2bd660beda506f222ca7821dcbe193997275872c43f6f5078edbef0",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 85,
+     "instanceText": "#85=IfcShapeRepresentation(#16,'Body','Brep',(#84))",
+     "attribute": "IfcShapeRepresentation.CorrectItemsForType",
+     "message": "IfcShapeRepresentationTypes(SELF.RepresentationType, SELF.Items)\n\nViolated by:\n    False\n     +  where False = IfcShapeRepresentationTypes('Brep', (#84=IfcExtrudedAreaSolid(#83,#14,#12,0.2),))\n     +    where 'Brep' = #85=IfcShapeRepresentation(#16,'Body','Brep',(#84)).RepresentationType\n     +    and   (#84=IfcExtrudedAreaSolid(#83,#14,#12,0.2),) = #85=IfcShapeRepresentation(#16,'Body','Brep',(#8"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/shape-in-non-geometric-context.ifc": {
+   "sha256": "ef95379e271127195f22571b6d5d48bb3ba7fb46fd3910dc0bcc9fc4f3eef1bd",
+   "findings": [
+    {
+     "type": "schema",
+     "instance": 138,
+     "instanceText": "#138=IfcRepresentationContext('Plain','Notes')",
+     "attribute": null,
+     "message": "Entity IfcRepresentationContext is abstract"
+    },
+    {
+     "type": "entity_rule",
+     "instance": 85,
+     "instanceText": "#85=IfcShapeRepresentation(#138,'Body','SweptSolid',(#84))",
+     "attribute": "IfcShapeRepresentation.CorrectContext",
+     "message": "('ifc4x3_add2.ifcgeometricrepresentationcontext' in typeof(SELF.ContextOfItems))\n\nViolated by:\n    ('ifc4x3_add2.ifcgeometricrepresentationcontext' in {'ifc4x3_add2.ifcrepresentationcontext'})\n     +  where {'ifc4x3_add2.ifcrepresentationcontext'} = typeof(#138=IfcRepresentationContext('Plain','Notes'))\n     +    where #138=IfcRepresentationContext('Plain','Notes') = #85=IfcShapeRepresentation(#13"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/shape-shared-by-two-products.ifc": {
+   "sha256": "4e5ae88a20ccead50c85fcdb80726b3a99646d4325e226e31f0df7c9b81b1369",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 36,
+     "instanceText": "#36=IfcShapeRepresentation(#16,'Body','SweptSolid',(#35))",
+     "attribute": "IfcShapeModel.WR11",
+     "message": "(sizeof(SELF.OfProductRepresentation) == 1) ^ (sizeof(SELF.RepresentationMap) == 1) ^ (sizeof(ofshapeaspect) == 1)\n\nViolated by:\n    ((2 == 1 ^ 0 == 1) ^ 0 == 1)\n     +  where 2 = sizeof((#41=IfcProductDefinitionShape($,$,(#40,#36)), #91=IfcProductDefinitionShape($,$,(#94,#36))))\n     +    where (#41=IfcProductDefinitionShape($,$,(#40,#36)), #91=IfcProductDefinitionShape($,$,(#94,#36))) = #36=IfcS"
+    },
+    {
+     "type": "entity_rule",
+     "instance": 95,
+     "instanceText": "#95=IfcShapeRepresentation(#16,'Body','SweptSolid',(#35))",
+     "attribute": "IfcShapeModel.WR11",
+     "message": "(sizeof(SELF.OfProductRepresentation) == 1) ^ (sizeof(SELF.RepresentationMap) == 1) ^ (sizeof(ofshapeaspect) == 1)\n\nViolated by:\n    ((0 == 1 ^ 0 == 1) ^ 0 == 1)\n     +  where 0 = sizeof(())\n     +    where () = #95=IfcShapeRepresentation(#16,'Body','SweptSolid',(#35)).OfProductRepresentation\n     +  and   0 = sizeof(())\n     +    where () = #95=IfcShapeRepresentation(#16,'Body','SweptSolid',(#35)"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/local-placement-3d-under-2d.ifc": {
+   "sha256": "5ded26168de571bdd8310f30e80eee412b0fd8030a13ba3ec7330f2d95e0ec74",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 63,
+     "instanceText": "#63=IfcLocalPlacement(#50,#14)",
+     "attribute": "IfcLocalPlacement.WR21",
+     "message": "IfcCorrectLocalPlacement(relativeplacement, placementrelto)\n\nViolated by:\n    False\n     +  where False = IfcCorrectLocalPlacement(#14=IfcAxis2Placement3D(#11,#12,#13), #50=IfcLocalPlacement(#30,#33))\n\nOn instance:\n    #63=IfcLocalPlacement(#50,#14)\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/subcontext-userdefined-view.ifc": {
+   "sha256": "3e9c54e2b98181c4b61292db4a3d29ef378e255eee1048a512aabbdd08f07b74",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 16,
+     "instanceText": "#16=IfcGeometricRepresentationSubContext('Body','Model',*,*,*,*,#15,$,.USERDEFINED.,$)",
+     "attribute": "IfcGeometricRepresentationSubContext.UserTargetProvided",
+     "message": "(targetview != IfcGeometricProjectionEnum.USERDEFINED or (targetview == IfcGeometricProjectionEnum.USERDEFINED and exists(userdefinedtargetview)))\n\nViolated by:\n    (('USERDEFINED' != 'USERDEFINED' or ('USERDEFINED' == 'USERDEFINED' and False)))\n     +  where 'USERDEFINED' = IfcGeometricProjectionEnum.USERDEFINED\n     +  and   'USERDEFINED' = IfcGeometricProjectionEnum.USERDEFINED\n     +  and   Fa"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/subcontext-explicit-derived.ifc": {
+   "sha256": "0107b557bd7e7015586f2bae97842850d27dd1341318ca50b10b9f0511ed80b4",
+   "findings": []
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/pset-without-name.ifc": {
+   "sha256": "6c03361a83bf1682532b8800ab108b38588006beae3a5e0588c131c252df73fb",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 42,
+     "instanceText": "#42=IfcWall('2xxxxxxxxxxxxxxxxxxxx8',#5,'Wall A',$,$,#30,#41,$,.STANDARD.)",
+     "attribute": "IfcObject.UniquePropertySetNames",
+     "message": "(sizeof(isdefinedby) == 0 or IfcUniqueDefinitionNames(isdefinedby))\n\nViolated by:\n    unhashable type: 'indeterminate_type'\n\nOn instance:\n    #42=IfcWall('2xxxxxxxxxxxxxxxxxxxx8',#5,'Wall A',$,$,#30,#41,$,.STANDARD.)\n"
+    },
+    {
+     "type": "entity_rule",
+     "instance": 132,
+     "instanceText": "#132=IfcPropertySet('2xxxxxxxxxxxxxxxxxxxxQ',#5,$,$,(#130,#131))",
+     "attribute": "IfcPropertySet.ExistsName",
+     "message": "exists(SELF.Name)\n\nViolated by:\n    False\n     +  where False = exists(<indeterminate_type object at 0x0000026639031350>)\n     +    where <indeterminate_type object at 0x0000026639031350> = #132=IfcPropertySet('2xxxxxxxxxxxxxxxxxxxxQ',#5,$,$,(#130,#131)).Name\n\nOn instance:\n    #132=IfcPropertySet('2xxxxxxxxxxxxxxxxxxxxQ',#5,$,$,(#130,#131))\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/pset-duplicate-property-names.ifc": {
+   "sha256": "75a077f6a8300ab98d5c285a8ab8a885f5093c1ed9d7956963391d7621de11d4",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 132,
+     "instanceText": "#132=IfcPropertySet('2xxxxxxxxxxxxxxxxxxxxQ',#5,'Pset_WallCommon',$,(#130,#131))",
+     "attribute": "IfcPropertySet.UniquePropertyNames",
+     "message": "IfcUniquePropertyName(hasproperties)\n\nViolated by:\n    False\n     +  where False = IfcUniquePropertyName((#130=IfcPropertySingleValue('FireRating',$,IfcLabel('REI90'),$), #131=IfcPropertySingleValue('FireRating',$,IfcBoolean(.T.),$)))\n\nOn instance:\n    #132=IfcPropertySet('2xxxxxxxxxxxxxxxxxxxxQ',#5,'Pset_WallCommon',$,(#130,#131))\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/two-psets-same-name.ifc": {
+   "sha256": "016d190250bd94377fe3fd6567a1b7c0b2631d77aabdd2e3655480eaf5c531cd",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 42,
+     "instanceText": "#42=IfcWall('2xxxxxxxxxxxxxxxxxxxx8',#5,'Wall A',$,$,#30,#41,$,.STANDARD.)",
+     "attribute": "IfcObject.UniquePropertySetNames",
+     "message": "(sizeof(isdefinedby) == 0 or IfcUniqueDefinitionNames(isdefinedby))\n\nViolated by:\n    ((3 == 0 or False))\n     +  where 3 = sizeof((#133=IfcRelDefinesByProperties('2xxxxxxxxxxxxxxxxxxxxR',#5,$,$,(#42),#132), #137=IfcRelDefinesByProperties('2xxxxxxxxxxxxxxxxxxxxT',#5,$,$,(#42),#136), #139=IfcRelDefinesByProperties('2xxxxxxxxxxxxxxxxxxxxV',#5,$,$,(#42),#138)))\n     +  and   False = IfcUniqueDefiniti"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/quantity-negative-length.ifc": {
+   "sha256": "2df31725dfc7975b486bacbb89e6e6ea235dbdc8b0a7a4bfcbe5b051a33f7a63",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 134,
+     "instanceText": "#134=IfcQuantityLength('Length',$,$,-5.,$)",
+     "attribute": "IfcQuantityLength.WR22",
+     "message": "(lengthvalue >= 0.0)\n\nViolated by:\n    (-5.0 >= 0.0)\n\nOn instance:\n    #134=IfcQuantityLength('Length',$,$,-5.,$)\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/unit-wrong-dimensions.ifc": {
+   "sha256": "5632f00d598392d03a0bc428235230e49172b20041c0678456759318a110c8f3",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 7,
+     "instanceText": "#7=IfcSIUnit(*,.AREAUNIT.,$,.METRE.)",
+     "attribute": "IfcNamedUnit.WR1",
+     "message": "IfcCorrectDimensions(SELF.UnitType, SELF.Dimensions)\n\nViolated by:\n    False\n     +  where False = IfcCorrectDimensions('AREAUNIT', #4490=IfcDimensionalExponents(1,0,0,0,0,0,0))\n     +    where 'AREAUNIT' = #7=IfcSIUnit(*,.AREAUNIT.,$,.METRE.).UnitType\n     +    and   #4490=IfcDimensionalExponents(1,0,0,0,0,0,0) = #7=IfcSIUnit(*,.AREAUNIT.,$,.METRE.).Dimensions\n\nOn instance:\n    #7=IfcSIUnit(*,.AR"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/unit-assignment-duplicate-type.ifc": {
+   "sha256": "8921c1dc1acc99efdeeb950eb53890dd089057729d682b163ad79cd6a9ed8fc9",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 10,
+     "instanceText": "#10=IfcUnitAssignment((#6,#7,#8,#9,#138))",
+     "attribute": "IfcUnitAssignment.WR01",
+     "message": "IfcCorrectUnitAssignment(units)\n\nViolated by:\n    False\n     +  where False = IfcCorrectUnitAssignment((#6=IfcSIUnit(*,.LENGTHUNIT.,$,.METRE.), #7=IfcSIUnit(*,.AREAUNIT.,$,.SQUARE_METRE.), #8=IfcSIUnit(*,.VOLUMEUNIT.,$,.CUBIC_METRE.), #9=IfcSIUnit(*,.PLANEANGLEUNIT.,$,.RADIAN.), #138=IfcSIUnit(*,.LENGTHUNIT.,.MILLI.,.METRE.)))\n\nOn instance:\n    #10=IfcUnitAssignment((#6,#7,#8,#9,#138))\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/ownerhistory-added-without-date.ifc": {
+   "sha256": "5021f0a057b5ca3ba0ddfc3d9068a582b5d428fac3907bd6fd816ab8caed2e6d",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 5,
+     "instanceText": "#5=IfcOwnerHistory(#3,#4,$,.ADDED.,$,$,$,1700000000)",
+     "attribute": "IfcOwnerHistory.CorrectChangeAction",
+     "message": "(exists(lastmodifieddate) or (not exists(lastmodifieddate) and (not exists(changeaction))) or (not exists(lastmodifieddate) and exists(changeaction) and (changeaction == IfcChangeActionEnum.NOTDEFINED or changeaction == IfcChangeActionEnum.NOCHANGE)))\n\nViolated by:\n    ((False or (not False and not True) or (not False and True and ('ADDED' == 'NOTDEFINED' or 'ADDED' == 'NOCHANGE'))))\n     +  where"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/person-without-name.ifc": {
+   "sha256": "1328ae7ceab5d6a42d9de6a6836b2c9af8c52a5d877ce2084f4064d7928b64af",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 1,
+     "instanceText": "#1=IfcPerson($,$,$,$,$,$,$,$)",
+     "attribute": "IfcPerson.IdentifiablePerson",
+     "message": "(exists(identification) or exists(familyname) or exists(givenname))\n\nViolated by:\n    ((False or False or False))\n     +  where False = exists(<indeterminate_type object at 0x00000266364B7C50>)\n     +  and   False = exists(<indeterminate_type object at 0x00000266364B7C50>)\n     +  and   False = exists(<indeterminate_type object at 0x00000266364B7C50>)\n\nOn instance:\n    #1=IfcPerson($,$,$,$,$,$,$,$"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/grid-without-placement.ifc": {
+   "sha256": "c1847619ec30810aef099232cf517fbd1ddd4a544276ac6fa9315c7fff1bc08f",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 119,
+     "instanceText": "#119=IfcGrid('2xxxxxxxxxxxxxxxxxxxxO',#5,'Grid',$,$,$,$,(#113),(#117),$,.RECTANGULAR.)",
+     "attribute": "IfcPositioningElement.HasPlacement",
+     "message": "exists(SELF.ObjectPlacement)\n\nViolated by:\n    False\n     +  where False = exists(<indeterminate_type object at 0x0000026638997E10>)\n     +    where <indeterminate_type object at 0x0000026638997E10> = #119=IfcGrid('2xxxxxxxxxxxxxxxxxxxxO',#5,'Grid',$,$,$,$,(#113),(#117),$,.RECTANGULAR.).ObjectPlacement\n\nOn instance:\n    #119=IfcGrid('2xxxxxxxxxxxxxxxxxxxxO',#5,'Grid',$,$,$,$,(#113),(#117),$,.RECTA"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/grid-axis-3d-curve.ifc": {
+   "sha256": "d4bd7a27b30e075f81a7d1ada71eef9da113d4a686e6b35278808b4a3224b9bc",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 113,
+     "instanceText": "#113=IfcGridAxis('A',#140,.T.)",
+     "attribute": "IfcGridAxis.WR1",
+     "message": "(axiscurve.Dim == 2)\n\nViolated by:\n    (3 == 2)\n     +  where 3 = #140=IfcPolyline((#138,#139)).Dim\n\nOn instance:\n    #113=IfcGridAxis('A',#140,.T.)\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/polyline-mixed-dimensions.ifc": {
+   "sha256": "a96b86f82418cd34bbaece9a7810cff7cdde1a7fa7c54f769cc206533a18f804",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 39,
+     "instanceText": "#39=IfcPolyline((#37,#52))",
+     "attribute": "IfcPolyline.SameDim",
+     "message": "(sizeof([temp for temp in points if temp.Dim != points[1].Dim]) == 0)\n\nViolated by:\n    (1 == 0)\n     +  where 1 = sizeof([#52=IfcCartesianPoint((1.,0.,0.))])\n\nOn instance:\n    #39=IfcPolyline((#37,#52))\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/profile-outer-curve-3d.ifc": {
+   "sha256": "879b98e154d709b80e2981a39907b6dd209040281c4a98a9e3dbfa8ca03583a7",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 83,
+     "instanceText": "#83=IfcArbitraryClosedProfileDef(.AREA.,$,#140)",
+     "attribute": "IfcArbitraryClosedProfileDef.WR1",
+     "message": "(outercurve.Dim == 2)\n\nViolated by:\n    (3 == 2)\n     +  where 3 = #140=IfcPolyline((#11,#138,#139,#11)).Dim\n\nOn instance:\n    #83=IfcArbitraryClosedProfileDef(.AREA.,$,#140)\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/material-priority-out-of-range.ifc": {
+   "sha256": "521caab8c51f202b0c87174fd952ca0d42597b1eb31279f6ecd158dbcc9a22e4",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 44,
+     "instanceText": "#44=IfcMaterialLayer(#43,0.2,$,$,$,$,150)",
+     "attribute": "IfcMaterialLayer.NormalizedPriority",
+     "message": "(not exists(priority) or 0 <= priority <= 100)\n\nViolated by:\n    ((not True or 150 <= 100))\n     +  where True = exists(150)\n\nOn instance:\n    #44=IfcMaterialLayer(#43,0.2,$,$,$,$,150)\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/wallstandardcase-without-layer-usage.ifc": {
+   "sha256": "19ddffa7be253698aab8e8082c24bb48fca56af3479e5e7ae3a9547807dc1efc",
+   "findings": [
+    {
+     "type": "schema",
+     "instance": 46,
+     "instanceText": "#46=IfcMaterialLayerSetUsage(#45,.AXIS2.,.POSITIVE.,-0.1,$)",
+     "attribute": "IfcMaterialLayerSetUsage.AssociatedTo",
+     "message": "With inverse:\n    AssociatedTo : SET [1:?] OF IfcRelAssociatesMaterial FOR RelatingMaterial\nValue:\n    ()\nNot valid\n"
+    },
+    {
+     "type": "entity_rule",
+     "instance": 60,
+     "instanceText": "#60=IfcWallStandardCase('2xxxxxxxxxxxxxxxxxxxxD',#5,'Wall B',$,$,#90,#91,$,.STANDARD.)",
+     "attribute": "IfcWallStandardCase.HasMaterialLayerSetUsage",
+     "message": "(sizeof([temp for temp in usedin(SELF, 'ifc4x3_add2.ifcrelassociates.relatedobjects') if 'ifc4x3_add2.ifcrelassociatesmaterial' in typeof(temp) and 'ifc4x3_add2.ifcmateriallayersetusage' in typeof(temp.RelatingMaterial)]) == 1)\n\nViolated by:\n    (0 == 1)\n     +  where 0 = sizeof([])\n\nOn instance:\n    #60=IfcWallStandardCase('2xxxxxxxxxxxxxxxxxxxxD',#5,'Wall B',$,$,#90,#91,$,.STANDARD.)\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/opening-voids-nothing.ifc": {
+   "sha256": "b712ffa3dc0d7dc6ad08a04619a689350e84728be765997644316f81e84f3340",
+   "findings": [
+    {
+     "type": "schema",
+     "instance": 70,
+     "instanceText": "#70=IfcOpeningElement('2xxxxxxxxxxxxxxxxxxxxH',#5,'Window opening',$,$,#71,#58,$,.OPENING.)",
+     "attribute": "IfcOpeningElement.VoidsElements",
+     "message": "With inverse:\n    VoidsElements : IfcRelVoidsElement FOR RelatedOpeningElement\nValue:\n    ()\nNot valid\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/door-fills-two-openings.ifc": {
+   "sha256": "68dfaf99eaeb6bf497d5c02c50afff31ab84d71e3295695a35866d9035e21396",
+   "findings": [
+    {
+     "type": "schema",
+     "instance": 62,
+     "instanceText": "#62=IfcDoor('2xxxxxxxxxxxxxxxxxxxxF',#5,'Door',$,$,#63,$,$,2.1,1.,.DOOR.,.SINGLE_SWING_LEFT.,$)",
+     "attribute": "IfcDoor.FillsVoids",
+     "message": "With inverse:\n    FillsVoids : SET [0:1] OF IfcRelFillsElement FOR RelatedBuildingElement\nValue:\n    [\n      1. #64=IfcRelFillsElement('2xxxxxxxxxxxxxxxxxxxxG',#5,$,$,#59,#62)\n      2. #75=IfcRelFillsElement('2xxxxxxxxxxxxxxxxxxxxK',#5,$,$,#70,#62)\n    ]\nNot valid\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/wall-contained-twice.ifc": {
+   "sha256": "462f6f85f1cf82fadf249c261aa4dab64dea67f562a0458291ad364d66fc4250",
+   "findings": [
+    {
+     "type": "schema",
+     "instance": 42,
+     "instanceText": "#42=IfcWall('2xxxxxxxxxxxxxxxxxxxx8',#5,'Wall A',$,$,#30,#41,$,.STANDARD.)",
+     "attribute": "IfcWall.ContainedInStructure",
+     "message": "With inverse:\n    ContainedInStructure : SET [0:1] OF IfcRelContainedInSpatialStructure FOR RelatedElements\nValue:\n    [\n      1. #120=IfcRelContainedInSpatialStructure('2xxxxxxxxxxxxxxxxxxxxP',#5,$,$,(#42,#60,#62,#73,#88,#119),#26)\n      2. #138=IfcRelContainedInSpatialStructure('2xxxxxxxxxxxxxxxxxxxxU',#5,$,$,(#42),#101)\n    ]\nNot valid\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/defines-by-properties-on-type.ifc": {
+   "sha256": "5b84236663ca70997e2ad2db107f72a224f62c93800390d68d76d5bdc8608bb7",
+   "findings": [
+    {
+     "type": "entity_rule",
+     "instance": 133,
+     "instanceText": "#133=IfcRelDefinesByProperties('2xxxxxxxxxxxxxxxxxxxxR',#5,$,$,(#42,#48),#132)",
+     "attribute": "IfcRelDefinesByProperties.NoRelatedTypeObject",
+     "message": "(sizeof([types for types in SELF.RelatedObjects if 'ifc4x3_add2.ifctypeobject' in typeof(types)]) == 0)\n\nViolated by:\n    (1 == 0)\n     +  where 1 = sizeof([#48=IfcWallType('2xxxxxxxxxxxxxxxxxxxxA',#5,'Wall 200',$,$,$,$,$,$,.STANDARD.)])\n\nOn instance:\n    #133=IfcRelDefinesByProperties('2xxxxxxxxxxxxxxxxxxxxR',#5,$,$,(#42,#48),#132)\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/duplicate-globalid.ifc": {
+   "sha256": "47082dae7920fae31cf62cf3740098804e427a4396280067b7088a402ea0b803",
+   "findings": [
+    {
+     "type": "schema",
+     "instance": 60,
+     "instanceText": "#60=IfcWallStandardCase('2xxxxxxxxxxxxxxxxxxxx8',#5,'Wall B',$,$,#90,#91,$,.STANDARD.)",
+     "attribute": null,
+     "message": "On instance:\n    #60=IfcWallStandardCase('2xxxxxxxxxxxxxxxxxxxx8',#5,'Wall B',$,$,#90,#91,$,.STANDARD.)\n                            ^^^^^^^^^^^^^^^^^^^^^^^^                                      \nRule IfcRoot.UR1:\n    The attribute GlobalId should be unique\nViolated by:\n    #42=IfcWall('2xxxxxxxxxxxxxxxxxxxx8',#5,'Wall A',$,$,#30,#41,$,.STANDARD.)\n                ^^^^^^^^^^^^^^^^^^^^^^^^           "
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/globalid-invalid-characters.ifc": {
+   "sha256": "2c855bfa021d765d66abed409b7af73409aacd3a065a5dd2cd1087b0afc41238",
+   "findings": [
+    {
+     "type": "schema",
+     "instance": 42,
+     "instanceText": "#42=IfcWall('9!invalid-guid-chars!!x',#5,'Wall A',$,$,#30,#41,$,.STANDARD.)",
+     "attribute": null,
+     "message": "On instance:\n    #42=IfcWall('9!invalid-guid-chars!!x',#5,'Wall A',$,$,#30,#41,$,.STANDARD.)\n                ^^^^^^^^^^^^^^^^^^^^^^^^^                                      \nIfcGloballyUniqueId base64 validation:\n    The attribute GlobalId should be valid base64 encoded 128-bit number.\nViolated by:\n    Guid length should be 22 characters.\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/wall-missing-globalid.ifc": {
+   "sha256": "3e564a6b90154e83d535a388ec450e8a07f77e8ef64ff435b7c1d68da80d75da",
+   "findings": [
+    {
+     "type": "schema",
+     "instance": 42,
+     "instanceText": "#42=IfcWall($,#5,'Wall A',$,$,#30,#41,$,.STANDARD.)",
+     "attribute": "IfcWall.GlobalId",
+     "message": "Attribute not optional"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/wall-name-integer.ifc": {
+   "sha256": "674cf8a03d9760e4a803ee1d8494aceeb77daaabecadc8da60c3455fb0d75398",
+   "findings": [
+    {
+     "type": "schema",
+     "instance": 42,
+     "instanceText": "#42=IfcWall('2xxxxxxxxxxxxxxxxxxxx8',#5,42,$,$,#30,#41,$,.STANDARD.)",
+     "attribute": "Name",
+     "message": "With attribute:\n    <attribute Name?: <type IfcLabel: <string>>>\nValue:\n    42\nNot valid\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/wall-placement-wrong-entity.ifc": {
+   "sha256": "c1cd25d7147fac7b0e142d40fece7acafc8c4494915e407d6f5ba2e573f5eae6",
+   "findings": [
+    {
+     "type": "schema",
+     "instance": 42,
+     "instanceText": "#42=IfcWall('2xxxxxxxxxxxxxxxxxxxx8',#5,'Wall A',$,$,#11,#41,$,.STANDARD.)",
+     "attribute": "ObjectPlacement",
+     "message": "With attribute:\n    <attribute ObjectPlacement?: <entity IfcObjectPlacement>>\nValue:\n    #11=IfcCartesianPoint((0.,0.,0.))\nNot valid\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/point-integer-coordinates.ifc": {
+   "sha256": "bfa6399c66695618ed08400b1e3da168b9099fffd59ecb4a1040a6855314be0a",
+   "findings": [
+    {
+     "type": "schema",
+     "instance": 52,
+     "instanceText": "#52=IfcCartesianPoint((1,0,0))",
+     "attribute": "Coordinates",
+     "message": "With attribute:\n    <attribute Coordinates: <list [1:3] of <type IfcLengthMeasure: <real>>>>\nValue:\n    1\nNot valid\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/wall-enum-unknown-item.ifc": {
+   "sha256": "127dd224f59a3e410ec315b4c6e8ac5f2fb57406f91ced280904ed718bb39f79",
+   "findings": [
+    {
+     "type": "schema",
+     "instance": 42,
+     "instanceText": "#42=IFCWALL('2xxxxxxxxxxxxxxxxxxxx8',#5,'Wall A',$,$,#30,#41,$,.CURVED.);",
+     "attribute": null,
+     "message": "An enumeration literal 'CURVED' is not valid for type 'IfcWallTypeEnum' :\n\n#42=IFCWALL('2xxxxxxxxxxxxxxxxxxxx8',#5,'Wall A',$,$,#30,#41,$,.CURVED.);"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/wall-attribute-count.ifc": {
+   "sha256": "e7729581d4d76ffde0614e7680e2a5d041d7471b8f0c53274152f9f6a14c0497",
+   "findings": [
+    {
+     "type": "schema",
+     "instance": 42,
+     "instanceText": "#42=IfcWall('2xxxxxxxxxxxxxxxxxxxx8',#5,'Wall A',$,$,#30,#41,$,.STANDARD.)",
+     "attribute": null,
+     "message": "Expected 9 attribute values, found 10"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/abstract-entity-instance.ifc": {
+   "sha256": "267869b9a71ebd0a848aa6c49af3b95cffb2668d406f454fa2824b09c7adadce",
+   "findings": [
+    {
+     "type": "schema",
+     "instance": 138,
+     "instanceText": "#138=IfcElement('2xxxxxxxxxxxxxxxxxxxxU',#5,'Abstract',$,$,$,$,$)",
+     "attribute": null,
+     "message": "Entity IfcElement is abstract"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/select-untyped-value.ifc": {
+   "sha256": "57ed0c36d380804e8fd6142d1f0e7b61daf350029e5bb7f0c15d4e044348dea1",
+   "findings": [
+    {
+     "type": "schema",
+     "instance": 130,
+     "instanceText": "#130=IfcPropertySingleValue('FireRating',$,'REI90',$)",
+     "attribute": "NominalValue",
+     "message": "With attribute:\n    <attribute NominalValue?: <select IfcValue: (<select IfcDerivedMeasureValue: (<type IfcAbsorbedDoseMeasure: <real>> | <type IfcAccelerationMeasure: <real>> | <type IfcAngularVelocityMeasure: <real>> | <type IfcAreaDensityMeasure: <real>> | <type IfcCompoundPlaneAngleMeasure: <list [3:4] of <integer>>> | <type IfcCurvatureMeasure: <real>> | <type IfcDoseEquivalentMeasure: <real>"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/typed-value-in-plain-slot.ifc": {
+   "sha256": "df84922d511956bc9aa768d94fe00d24ab1bfe243708fe5d6857d9f9564199e6",
+   "findings": [
+    {
+     "type": "schema",
+     "instance": 42,
+     "instanceText": "#42=IfcWall('2xxxxxxxxxxxxxxxxxxxx8',#5,IfcLabel('Wall A'),$,$,#30,#41,$,.STANDARD.)",
+     "attribute": "Name",
+     "message": "With attribute:\n    <attribute Name?: <type IfcLabel: <string>>>\nValue:\n    IfcLabel('Wall A')\nNot valid\n"
+    }
+   ]
+  },
+  "packages/validate/parity/corpus/ifc4x3/broken/header-author-not-list.ifc": {
+   "sha256": "6e7051647e60bed84c1bf0a3c73cf595be4a665cf54b19c13c1055ccd79e6cd0",
+   "findings": [
+    {
+     "type": "schema",
+     "instance": null,
+     "instanceText": null,
+     "attribute": null,
+     "message": "For instance:\n    FILE_NAME('corpus.ifc','2026-11-19T00:00:00','Jane Doe',('Example Org'),'ifc-lite','ifc-lite corpus','')\n                                                 ^^^^^^^^^^                                                 \nAttribute 'author' has invalid type:\n    Expected: LIST [ 1 : ? ] OF STRING (256)\n    Current value type: str\n"
     }
    ]
   }

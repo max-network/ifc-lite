@@ -47,10 +47,11 @@ function readJson<T>(path: string): T {
 }
 
 function corpus(): { files: CorpusFile[]; missing: string[] } {
-  const manifest = readJson<Array<{ file: string; targets: string }>>(join(here, 'corpus/manifest.json'));
+  const manifest = readJson<Array<{ file: string; targets: string | null }>>(join(here, 'corpus/manifest.json'));
   const files: CorpusFile[] = [
     { path: 'packages/validate/parity/corpus/base-ifc4.ifc', kind: 'crafted' },
-    ...manifest.map((m) => ({ path: `packages/validate/parity/corpus/${m.file}`, kind: 'crafted' as const, targets: m.targets })),
+    { path: 'packages/validate/parity/corpus/ifc4x3/base.ifc', kind: 'crafted' },
+    ...manifest.map((m) => ({ path: `packages/validate/parity/corpus/${m.file}`, kind: 'crafted' as const, ...(m.targets ? { targets: m.targets } : {}) })),
   ];
   const missing: string[] = [];
   for (const path of readJson<{ files: string[] }>(join(here, 'real-models.json')).files) {
@@ -107,7 +108,7 @@ async function main(): Promise<void> {
   const crafted = comparisons.filter((c) => c.kind === 'crafted');
   const targeted = crafted.filter((c) => c.targets).map((c) => {
     const hit = (keys: string[]) => keys.some((k) => hitsTarget(k, c.targets!));
-    return { file: c.path.split('/').pop()!, targets: c.targets!, ours: hit([...c.tp, ...c.fp]), oracle: hit([...c.tp, ...c.fn]) };
+    return { file: c.path.replace('packages/validate/parity/corpus/', ''), targets: c.targets!, ours: hit([...c.tp, ...c.fp]), oracle: hit([...c.tp, ...c.fn]) };
   });
   const report = {
     generatedAt: new Date().toISOString().slice(0, 10),
