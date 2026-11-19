@@ -110,6 +110,6 @@ DATA;
 #135=IFCQUANTITYAREA('NetSideArea',$,$,13.,$);
 #136=IFCELEMENTQUANTITY('2xxxxxxxxxxxxxxxxxxxxS',#5,'Qto_WallBaseQuantities',$,$,(#134,#135));
 #137=IFCRELDEFINESBYPROPERTIES('2xxxxxxxxxxxxxxxxxxxxT',#5,$,$,(#42),#136);
-#138=IFCBUILDINGELEMENT('2xxxxxxxxxxxxxxxxxxxxU',#5,'Abstract',$,$,$,$,$);
+#138=IFCELEMENT('2xxxxxxxxxxxxxxxxxxxxU',#5,'Abstract',$,$,$,$,$);
 ENDSEC;
 END-ISO-10303-21;

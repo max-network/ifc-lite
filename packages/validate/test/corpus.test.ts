@@ -17,7 +17,8 @@ import { compareFile } from '../parity/compare.js';
 import { hitsTarget, keyString, ourKey, type OracleFinding } from '../parity/normalize.js';
 
 const corpusDir = join(__dirname, '..', 'parity', 'corpus');
-const manifest: Array<{ file: string; targets: string }> = JSON.parse(readFileSync(join(corpusDir, 'manifest.json'), 'utf8'));
+const manifest: Array<{ file: string; schema: string; targets: string | null }> = JSON.parse(readFileSync(join(corpusDir, 'manifest.json'), 'utf8'));
+const targeted = manifest.filter((m): m is { file: string; schema: string; targets: string } => m.targets !== null);
 const oracle: { files: Record<string, { findings: OracleFinding[] }> } = JSON.parse(
   readFileSync(join(__dirname, '..', 'parity', 'oracle-cache.json'), 'utf8'),
 );
@@ -25,13 +26,13 @@ const read = (file: string) => readFileSync(join(corpusDir, file), 'utf8');
 const oracleFor = (file: string) => oracle.files[`packages/validate/parity/corpus/${file}`]?.findings;
 
 describe('crafted parity corpus', () => {
-  it('accepts the base model', async () => {
-    const report = await validateStepText(read('base-ifc4.ifc'));
+  it.each(['base-ifc4.ifc', 'ifc4x3/base.ifc'])('accepts the base model %s', async (file) => {
+    const report = await validateStepText(read(file));
     expect(report.findings).toEqual([]);
     expect(report.valid).toBe(true);
   });
 
-  it.each(manifest)('$file: reports $targets', async ({ file, targets }) => {
+  it.each(targeted)('$file: reports $targets', async ({ file, targets }) => {
     const report = await validateStepText(read(file));
     expect(report.findings.some((f) => hitsTarget(keyString(ourKey(f)), targets))).toBe(true);
   });
