@@ -112,7 +112,3 @@ export function int(v: Value): number | undefined {
   const n = num(v);
   return n === undefined || !Number.isFinite(n) ? undefined : Math.trunc(n);
 }
-
-export function isLogical(v: Value): v is Logical {
-  return v === true || v === false || v === UNKNOWN;
-}
