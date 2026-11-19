@@ -1,0 +1,5 @@
+---
+"@ifc-lite/drawing-2d": minor
+---
+
+Floor plans reach construction-sheet quality. `generateStoreyPlan(meshes, { storeyElevation, frame, ... })` cuts at the storey elevation plus the cut height in model coordinates (moved through the render frame's RTC offset and origin shift with `storeyCutElevation`), draws building fabric only (`PLAN_ELEMENT_FILTER`), replaces door and window bodies with symbols derived from each element's placement and operation type, and draws spaces as room boundaries with labels (`Drawing2D.planSymbols`, `Drawing2D.planLabels`). `exportToSVG` renders those layers, hatches cut polygons by material category when `materialCategories` is passed (`classifyMaterialName` maps material names), defines a fill pattern for every hatch type, and draws cardinal plan cuts north-up instead of mirrored. `Drawing2DGenerator.generate` drops type-library geometry (`geometryClass` 1/2) the way the viewer's Model view does, configurable through `elementFilter`. `polygonsAreaCentroid`, `parseDoorOperation` and `parseWindowPartitioning` are exported.

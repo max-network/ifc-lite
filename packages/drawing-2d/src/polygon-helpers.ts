@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import type { Point2D } from './types.js';
+import type { DrawingPolygon, Point2D } from './types.js';
 
 /**
  * Simplify polygon by removing collinear points
@@ -96,4 +96,27 @@ export function removeCollinearRingVertices(points: Point2D[], tolerance: number
     if (!onChord(kept[kept.length - 1], curr, next)) kept.push(curr);
   }
   return kept.length >= 3 ? kept : points;
+}
+
+/**
+ * Area-weighted centroid of an element's cut fragments, holes subtracted, or
+ * null when they enclose no area. Every fragment contributes, so tessellation
+ * order cannot move the point.
+ */
+export function polygonsAreaCentroid(polygons: readonly DrawingPolygon[]): Point2D | null {
+  let area = 0, x = 0, y = 0;
+  for (const { polygon } of polygons) {
+    for (const [ringIndex, ring] of [polygon.outer, ...polygon.holes].entries()) {
+      let a = 0, cx = 0, cy = 0;
+      for (let i = 0; i < ring.length; i++) {
+        const p = ring[i], q = ring[(i + 1) % ring.length];
+        const cross = p.x * q.y - q.x * p.y;
+        a += cross; cx += (p.x + q.x) * cross; cy += (p.y + q.y) * cross;
+      }
+      if (Math.abs(a) < 1e-12) continue;
+      const weight = Math.abs(a) * (ringIndex === 0 ? 1 : -1);
+      x += (cx / (3 * a)) * weight; y += (cy / (3 * a)) * weight; area += weight;
+    }
+  }
+  return area > 1e-12 ? { x: x / area, y: y / area } : null;
 }

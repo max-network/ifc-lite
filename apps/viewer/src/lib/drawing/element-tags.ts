@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { effectiveMetadataRecord, extractPropertiesOnDemand, extractQuantitiesOnDemand } from '@ifc-lite/parser';
-import type { Drawing2D, DrawingPolygon } from '@ifc-lite/drawing-2d';
+import { polygonsAreaCentroid, type Drawing2D, type DrawingPolygon } from '@ifc-lite/drawing-2d';
 import { useViewerStore } from '@/store';
 import { toGlobalIdForRef } from '@/store/globalId';
 import type { Point2D, TagAnnotation2D, TextAnnotation2D } from '@/store/slices/drawing2DSlice';
@@ -37,23 +37,9 @@ export function resolveElementTagLabel(tag: TagAnnotation2D): string | null {
 
 /** Area-weighted cut centroid. All fragments contribute, so tessellation order cannot move a tag. */
 export function resolveElementTagAnchor(tag: TagAnnotation2D, polygons: readonly DrawingPolygon[], globalId: number): Point2D {
-  let area = 0, x = 0, y = 0;
   const fragments = polygons.filter(polygon => polygon.entityId === globalId);
   const cuts = fragments.filter(polygon => polygon.isCut);
-  for (const polygon of cuts.length > 0 ? cuts : fragments) {
-    for (const [ringIndex, ring] of [polygon.polygon.outer, ...polygon.polygon.holes].entries()) {
-      let a = 0, cx = 0, cy = 0;
-      for (let i = 0; i < ring.length; i++) {
-        const p = ring[i], q = ring[(i + 1) % ring.length];
-        const cross = p.x * q.y - q.x * p.y;
-        a += cross; cx += (p.x + q.x) * cross; cy += (p.y + q.y) * cross;
-      }
-      if (Math.abs(a) < 1e-12) continue;
-      const weight = Math.abs(a) * (ringIndex === 0 ? 1 : -1);
-      x += cx / (3 * a) * weight; y += cy / (3 * a) * weight; area += weight;
-    }
-  }
-  const anchor = area > 1e-12 ? { x: x / area, y: y / area } : tag.anchor;
+  const anchor = polygonsAreaCentroid(cuts.length > 0 ? cuts : fragments) ?? tag.anchor;
   return { x: anchor.x + tag.offset.x, y: anchor.y + tag.offset.y };
 }
 

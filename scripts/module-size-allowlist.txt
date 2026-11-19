@@ -174,7 +174,7 @@
    432 packages/data/src/property-table.ts
    457 packages/data/src/step-serializers.ts
    508 packages/data/src/types.ts
-   541 packages/drawing-2d/src/drawing-generator.ts
+   538 packages/drawing-2d/src/drawing-generator.ts
    502 packages/drawing-2d/src/dxf/convert.ts
    706 packages/drawing-2d/src/dxf/parser.ts
    413 packages/drawing-2d/src/dxf/writer.ts
@@ -190,9 +190,8 @@
    403 packages/drawing-2d/src/sheet/scale-stamp.ts
    599 packages/drawing-2d/src/sheet/title-block-renderer.ts
    489 packages/drawing-2d/src/styles.ts
-   537 packages/drawing-2d/src/svg-exporter.ts
    530 packages/drawing-2d/src/symbols/door-symbol.ts
-   807 packages/drawing-2d/src/types.ts
+   805 packages/drawing-2d/src/types.ts
    592 packages/export/src/effective-index.ts
    680 packages/export/src/ifc5-exporter.ts
   1585 packages/export/src/merged-exporter.ts

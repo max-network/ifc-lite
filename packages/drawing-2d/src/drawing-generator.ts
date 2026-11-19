@@ -46,6 +46,7 @@ import {
 import { isFeatureElementType } from './feature-elements.js';
 import { projectionBandMeshes, clipMeshToProjectionWindow } from './projection-clip.js';
 import { removeCoveredOverhead } from './projection-overlap.js';
+import { selectDrawableMeshes, type DrawingElementFilter } from './plan/element-filter.js';
 import {
   boundsEmpty,
   boundsExtendLine,
@@ -91,6 +92,8 @@ export interface GeneratorOptions {
    * can sit behind other geometry and must print dashed.
    */
   extraLines?: DrawingLine[];
+  /** Which meshes are drawn. Type-library geometry is dropped unless `includeTypeLibrary` (#2058). */
+  elementFilter?: DrawingElementFilter;
   /** Progress callback */
   onProgress?: (stage: string, progress: number) => void;
 }
@@ -148,6 +151,7 @@ export class Drawing2DGenerator {
   ): Promise<Drawing2D> {
     const opts = { ...DEFAULT_OPTIONS, ...options };
     const startTime = performance.now();
+    meshes = selectDrawableMeshes(meshes, opts.elementFilter);
 
     const report = (stage: string, progress: number) => {
       opts.onProgress?.(stage, progress);
@@ -161,18 +165,11 @@ export class Drawing2DGenerator {
     let cutSegments: CutSegment[];
 
     if (opts.useGPU && this.gpuCutter && this.gpuDevice && !config.plane.customPlane) {
-      // GPU path. Falls back to CPU when a custom (face-picked) plane is
-      // active because GPUSectionCutter still assumes cardinal axes —
-      // generalising the GPU path is tracked as follow-up work; for now
-      // CPU is fast enough on the FZK-Haus-class models the face-pick
-      // UX targets.
+      // GPU path; custom (face-picked) planes take the CPU path, as
+      // GPUSectionCutter still assumes cardinal axes.
       cutSegments = await this.gpuCutter.cutMeshes(meshes, config.plane);
     } else {
-      // CPU path. Always rebuild the cutter so a switch from cardinal
-      // to custom-plane (or between two different custom planes) takes
-      // effect immediately — caching the instance keyed only on
-      // existence, as the previous code did, would silently apply the
-      // first config used for the lifetime of the generator.
+      // CPU path. Rebuilt per call so a change of plane always takes effect.
       this.cpuCutter = new SectionCutter(config.plane);
       const cutResult = this.cpuCutter.cutMeshes(meshes);
       cutSegments = cutResult.segments;

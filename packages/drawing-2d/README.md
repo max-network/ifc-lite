@@ -29,6 +29,21 @@ const svg = exportToSVG(drawing, {
 document.body.innerHTML = svg;
 ```
 
+## Storey plan sheet
+
+Cut a storey at its elevation + 1.2 m in model coordinates, with door swings, window frames, labelled rooms and material poché:
+
+```typescript
+import { generateStoreyPlan, exportToSVG } from '@ifc-lite/drawing-2d';
+
+const plan = await generateStoreyPlan(geometryResult.meshes, {
+  storeyElevation: 0,
+  storeyHeight: 2.7,
+  frame: geometryResult.coordinateInfo,
+});
+const svg = exportToSVG(plan);
+```
+
 ## Section cut
 
 `generateSection` cuts vertically along the X or Z axis (use `generateFloorPlan` for horizontal cuts).

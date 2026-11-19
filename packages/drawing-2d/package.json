@@ -16,13 +16,17 @@
     "build": "pnpm exec tsc",
     "typecheck": "node ../../scripts/typecheck-tests.mjs",
     "dev": "pnpm exec tsc --watch",
-    "test": "vitest run"
+    "test": "vitest run",
+    "parity:plan": "node scripts/plan-parity.mjs"
   },
   "dependencies": {
     "@ifc-lite/geometry": "workspace:^"
   },
   "devDependencies": {
     "@ifc-lite/data": "workspace:^",
+    "@ifc-lite/parser": "workspace:^",
+    "@ifc-lite/wasm": "workspace:^",
+    "@ifc-lite/world-frame-fixtures": "workspace:^",
     "@mergifyio/vitest": "^2026.10.11",
     "@webgpu/types": "^0.1.74",
     "dxf-parser": "1.1.2",

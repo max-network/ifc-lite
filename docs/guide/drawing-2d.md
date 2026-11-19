@@ -149,6 +149,34 @@ console.log(`${drawing.stats.cutLineCount} cut lines`);
 console.log(`${drawing.stats.projectionLineCount} projection lines`);
 ```
 
+### Generating a Storey Plan Sheet
+
+`generateFloorPlan` cuts at a height in the meshes' render frame. For a sheet, `generateStoreyPlan` cuts a storey at its elevation plus the cut height in model coordinates (the render frame's RTC offset and origin shift are taken from `coordinateInfo`), draws building fabric only, puts door swings and window frames into the openings, and draws spaces as labelled room boundaries.
+
+```typescript
+import { generateStoreyPlan, exportToSVG, classifyMaterialName, type MaterialCategory } from '@ifc-lite/drawing-2d';
+
+const hierarchy = store.spatialHierarchy;
+const [storeyId, elevation] = [...(hierarchy?.storeyElevations ?? [])][0];
+const plan = await generateStoreyPlan(geometryResult.meshes, {
+  storeyElevation: elevation,
+  storeyHeight: hierarchy?.storeyHeights.get(storeyId),
+  frame: geometryResult.coordinateInfo,
+  storeyElements: new Set(hierarchy?.byStorey.get(storeyId)),
+  // Door operation type and width, as IfcDoor / IfcDoorType state them
+  openings: new Map([[17468, { operationType: '.SINGLE_SWING_RIGHT.', width: 0.885 }]]),
+  spaces: { labels: new Map([[1234, 'Living']]) },
+});
+
+// Hatch cut walls by material category instead of by IFC type
+const materialCategories = new Map<number, MaterialCategory>();
+const category = classifyMaterialName('Kalksandstein');
+if (category) materialCategories.set(17040, category);
+const svg = exportToSVG(plan, { materialCategories });
+```
+
+`Drawing2DGenerator.generate` drops type-library geometry (`IfcWallType` representation maps and the like) by default; pass `elementFilter` to change what is drawn, or `PLAN_ELEMENT_FILTER` for the plan default. Cardinal plan cuts export north-up. `packages/drawing-2d/test/plan-parity.test.ts` measures these goals on real models; `pnpm --filter @ifc-lite/drawing-2d parity:plan` writes the report.
+
 ### Generating a Section
 
 ```typescript
