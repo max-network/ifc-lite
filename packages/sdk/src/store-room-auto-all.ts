@@ -64,7 +64,7 @@ export async function prepareAllStoreyRooms(
   };
   validate();
   const write = (draft: CostStoreModelResolution): RoomCommandResult => {
-    const coverage = rows.map(row=>({...row,created:(plans.get(row.storeyId)?.length?createRoomsInStore(draft.store,draft.editor,row.storeyId,plans.get(row.storeyId)!):[]).map(expressId=>({modelId:model.modelId,expressId}))}));
+    const coverage = rows.map(row=>({...row,created:(plans.get(row.storeyId)?.length?createRoomsInStore(draft.store,draft.editor,row.storeyId,plans.get(row.storeyId)!,{guidRandom:draft.guidRandom}):[]).map(expressId=>({modelId:model.modelId,expressId}))}));
     return {created:coverage.flatMap(row=>row.created),updated:[],deleted:[],skipped:[],candidates:coverage.flatMap(row=>row.candidates),storeys:coverage};
   };
   // Unknown storeys must not authorize even the otherwise-known plans.

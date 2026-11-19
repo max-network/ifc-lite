@@ -66,6 +66,12 @@ export interface SpatialAnchor {
   guidRandom?: RandomSource;
 }
 
+/** GlobalId randomness for an operation that resolves its own anchor or
+ * writes relationships without one; see {@link SpatialAnchor.guidRandom}. */
+export interface AuthoringGuidOptions {
+  readonly guidRandom?: RandomSource;
+}
+
 function finiteRoundedLength(value: number): number {
   if (!Number.isFinite(value)) throw new Error('Length conversion overflow: derived length must be finite');
   // Above this bound decimal rounding itself would overflow. The number's
