@@ -16,6 +16,11 @@
       "import": "./dist/runtime/index.js",
       "default": "./dist/runtime/index.js"
     },
+    "./ifc4x3": {
+      "types": "./dist/ifc4x3.d.ts",
+      "import": "./dist/ifc4x3.js",
+      "default": "./dist/ifc4x3.js"
+    },
     "./ifc4/zod": {
       "types": "./dist/generated/ifc4/zod.d.ts",
       "import": "./dist/generated/ifc4/zod.js",

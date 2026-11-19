@@ -12579,6 +12579,14 @@
     "IfcZShapeProfileDef: const",
     "IfcZone: const"
   ],
+  "@ifc-lite/validate/ifc4x3": [
+    "FindingCategory: type",
+    "SCHEMA: const",
+    "ValidateOptions: interface",
+    "ValidationFinding: interface",
+    "ValidationReport: interface",
+    "validateIfc4x3StepText: function"
+  ],
   "@ifc-lite/validate/ifc4x3/zod": [
     "EntityRef: const",
     "IfcAbsorbedDoseMeasure: const",
