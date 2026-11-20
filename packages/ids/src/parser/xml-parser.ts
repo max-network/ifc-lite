@@ -51,14 +51,9 @@ export class IDSParseError extends Error {
   }
 }
 
-// `DOMParser` exists in browsers and in test envs (happy-dom/jsdom). Plain
-// Node has none, so parsing falls back to @xmldom/xmldom, loaded on the first
-// parse that needs it rather than at module evaluation: runtimes that report
-// `process.versions.node` without resolving Node packages (Cloudflare workerd,
-// with or without nodejs_compat) can then import this module, and every SDK
-// entry point that re-exports it, without a DOMParser placeholder. The load
-// goes through `process.getBuiltinModule` (Node 20.16+/22.3+) so no bundler
-// sees a static import of the Node-only package.
+// Browsers and test envs have `DOMParser`. Plain Node loads @xmldom/xmldom on
+// the first parse that needs it, through `process.getBuiltinModule`, so workerd
+// can import this module and no bundler sees the Node-only package.
 type DOMParserCtor = new () => { parseFromString(input: string, mime: string): Document };
 
 type NodeProcess = {
