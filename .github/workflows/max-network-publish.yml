@@ -16,6 +16,7 @@ on:
     paths:
       - .github/max-network-packages.json
       - .github/workflows/max-network-publish.yml
+      - .github/actions/max-network-verify/**
       - scripts/max-network/**
   workflow_dispatch:
     inputs:
@@ -42,56 +43,17 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - name: Verify
+        id: verify
+        uses: ./.github/actions/max-network-verify
         with:
-          node-version: 22
-
-      - name: Enable pnpm
-        run: corepack enable
-
-      - name: Install
-        run: pnpm install --frozen-lockfile
-
-      - name: Fetch the prebuilt wasm
-        run: pnpm build:wasm:fetch
-
-      - name: Select packages
-        id: select
-        env:
-          REQUESTED: ${{ inputs.packages }}
-        run: |
-          set -euo pipefail
-          LIST=$(node -e "
-            const all = require('./.github/max-network-packages.json').packages;
-            const asked = (process.env.REQUESTED || '').split(',').map(s => s.trim()).filter(Boolean);
-            const bad = asked.filter(p => !all.includes(p));
-            if (bad.length) { console.error('Not configured: ' + bad.join(', ')); process.exit(1); }
-            console.log((asked.length ? asked : all).join(','));
-          ")
-          FILTERS=$(node -e "console.log(process.argv[1].split(',').map(d => '--filter=' + require('./packages/' + d + '/package.json').name).join(' '))" "$LIST")
-          echo "list=$LIST" >> "$GITHUB_OUTPUT"
-          echo "filters=$FILTERS" >> "$GITHUB_OUTPUT"
-
-      # Typecheck reads sibling sources through path maps (sdk reaches
-      # sandbox, which reaches extensions) beyond its declared ^build graph,
-      # so every package is built first, as upstream CI does.
-      - name: Build every package
-        run: pnpm turbo build --filter='./packages/*'
-
-      # One package at a time: the worker-backed suites (pointcloud's real
-      # decode worker) hit their 5 s budgets when turbo runs them side by side
-      # on a hosted runner.
-      - name: Typecheck the selected packages
-        run: pnpm turbo typecheck ${{ steps.select.outputs.filters }}
-
-      - name: Test the selected packages
-        run: pnpm turbo test --concurrency=1 ${{ steps.select.outputs.filters }}
+          packages: ${{ inputs.packages }}
 
       - name: Publish
         env:
           PAT: ${{ secrets.GH_PACKAGES_TOKEN }}
           WORKFLOW_TOKEN: ${{ github.token }}
-          LIST: ${{ steps.select.outputs.list }}
+          LIST: ${{ steps.verify.outputs.list }}
         run: |
           set -euo pipefail
           for label in GH_PACKAGES_TOKEN "workflow token"; do
