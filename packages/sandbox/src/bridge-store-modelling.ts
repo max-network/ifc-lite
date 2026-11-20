@@ -158,7 +158,7 @@ export function buildStoreModellingMethods(): MethodSchema[] {
       doc: 'Change a roof by footprint (addRoof with EdgeSlopes/Overhang): one edge\'s slope, every slope (radians, 0 = gable end), Overhang or Thickness (metres). Rebuilds its planes as one undoable edit; a refusal writes nothing.',
       args: ['dump', 'dump'],
       paramNames: ['ref', 'patch'],
-      tsParamTypes: [ENTITY_REF, '{ EdgeSlopes?: number[]; Edge?: { Index: number; Slope: number }; Overhang?: number; Thickness?: number }'],
+      tsParamTypes: [ENTITY_REF, '{ EdgeSlopes?: number[]; Edge?: { Index: number; Slope: number }; EdgeBreaks?: Array<Array<{ Height: number; Slope: number }>>; Overhang?: number; Thickness?: number }'],
       tsReturn: ENTITY_REF,
       returns: 'value',
       call: (sdk, args) => {

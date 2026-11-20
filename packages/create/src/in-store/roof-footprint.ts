@@ -31,7 +31,7 @@ import { emitExtrudedSolid, emitPolygonProfile } from './_emit-helpers.js';
 import { getModelLengthUnitScale } from './edit/length-unit-scale.js';
 import { refId } from './host-geometry-frame.js';
 import { AnchorEntityReader } from './resolve-anchor.js';
-import { heightAt, openFootprint, planFootprintRoof, type FootprintRoofPlan, type RoofShapeType } from './roof-footprint-plan.js';
+import { heightAt, openFootprint, planFootprintRoof, roofPlaneTag, type FootprintRoofPlan, type RoofEdgeBreak, type RoofShapeType } from './roof-footprint-plan.js';
 
 export const ROOF_FOOTPRINT_PSET = 'IfcLite_RoofFootprint';
 
@@ -46,12 +46,19 @@ export interface RoofFootprintFields {
   EdgeSlopes?: number[];
   /** Horizontal overhang beyond every edge, metres. Eaves drop with their plane. Default 0. */
   Overhang?: number;
+  /**
+   * Per edge, where its slope changes, from the lowest up: `Height` metres above
+   * the eaves, then `Slope` radians. A gable end (slope 0) turning sloped is a
+   * half-hip; a steep slope turning shallower is a mansard. Omitted: none.
+   */
+  EdgeBreaks?: RoofEdgeBreak[][];
 }
 
 /** A roof by footprint as recorded on the roof: metres and radians, placement-local. */
 export interface FootprintRoofDefinition {
   readonly Footprint: Array<[number, number]>;
   readonly EdgeSlopes: number[];
+  readonly EdgeBreaks?: RoofEdgeBreak[][];
   readonly Overhang: number;
   readonly Thickness: number;
   readonly PredefinedType: RoofShapeType;
@@ -63,6 +70,8 @@ export interface RoofFootprintEdit {
   readonly EdgeSlopes?: number[];
   /** One edge's slope, radians; applied after `EdgeSlopes`. */
   readonly Edge?: { readonly Index: number; readonly Slope: number };
+  /** Every edge's breaks at once, metres and radians, one list per footprint edge. */
+  readonly EdgeBreaks?: RoofEdgeBreak[][];
   /** Metres. */
   readonly Overhang?: number;
   /** Metres, square to each plane. */
@@ -116,7 +125,8 @@ export function planFootprintRoofNative(
 ): FootprintRoofPlan {
   if (!Number.isFinite(definition.Thickness) || definition.Thickness <= 0) throw new Error('Thickness must be a positive length');
   const footprint = definition.Footprint.map((p) => [toNativeLength(anchor, p[0]), toNativeLength(anchor, p[1])] as [number, number]);
-  return planFootprintRoof(footprint, definition.EdgeSlopes, toNativeLength(anchor, definition.Overhang));
+  const breaks = definition.EdgeBreaks?.map((turns) => turns.map((b) => ({ Height: toNativeLength(anchor, b.Height), Slope: b.Slope })));
+  return planFootprintRoof(footprint, definition.EdgeSlopes, toNativeLength(anchor, definition.Overhang), breaks);
 }
 
 /** The body of a roof by footprint: one Body representation holding every plane's solid. */
@@ -142,14 +152,20 @@ export function footprintDefinitionProperties(definition: FootprintRoofDefinitio
   return [
     ['Footprint', JSON.stringify(definition.Footprint), PropertyValueType.Text],
     ['EdgeSlopes', JSON.stringify(definition.EdgeSlopes), PropertyValueType.Text],
+    ...(hasBreaks(definition.EdgeBreaks) ? [['EdgeBreaks', JSON.stringify(definition.EdgeBreaks), PropertyValueType.Text] as [string, string, PropertyValueType]] : []),
     ['Overhang', definition.Overhang, PropertyValueType.Real],
     ['Thickness', definition.Thickness, PropertyValueType.Real],
   ];
 }
 
-/** Record the definition on the roof. */
+const hasBreaks = (breaks: readonly RoofEdgeBreak[][] | undefined): breaks is RoofEdgeBreak[][] => breaks?.some((turns) => turns.length > 0) ?? false;
+
+/** Record the definition on the roof; a roof without breaks keeps no `EdgeBreaks` row. */
 export function writeFootprintDefinition(view: MutablePropertyView, roofId: number, definition: FootprintRoofDefinition): void {
   for (const [name, value, type] of footprintDefinitionProperties(definition)) view.setProperty(roofId, ROOF_FOOTPRINT_PSET, name, value, type);
+  if (!hasBreaks(definition.EdgeBreaks) && view.getPropertyValue(roofId, ROOF_FOOTPRINT_PSET, 'EdgeBreaks') !== null) {
+    view.deleteProperty(roofId, ROOF_FOOTPRINT_PSET, 'EdgeBreaks');
+  }
 }
 
 /** Preserve edge styles; a split inherits its flat source, and a merge requires one uniform style. */
@@ -237,9 +253,10 @@ function removeReplacedPlanes(store: IfcDataStore, draft: StoreEditor, itemIds: 
 function assertRoofEdit(patch: RoofFootprintEdit): void {
   if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw new Error('A roof edit must be an object');
   for (const name of Object.keys(patch)) {
-    if (!['EdgeSlopes', 'Edge', 'Overhang', 'Thickness'].includes(name)) throw new Error(`Unsupported roof edit field ${name}`);
+    if (!['EdgeSlopes', 'Edge', 'EdgeBreaks', 'Overhang', 'Thickness'].includes(name)) throw new Error(`Unsupported roof edit field ${name}`);
   }
   if (patch.EdgeSlopes !== undefined && !Array.isArray(patch.EdgeSlopes)) throw new Error('EdgeSlopes must be an array of radians, one per footprint edge');
+  if (patch.EdgeBreaks !== undefined && !Array.isArray(patch.EdgeBreaks)) throw new Error('EdgeBreaks must be an array with one list of breaks per footprint edge');
   const edge = patch.Edge as unknown;
   if (edge !== undefined && (edge === null || typeof edge !== 'object' || Array.isArray(edge)
     || typeof (edge as { Slope?: unknown }).Slope !== 'number' || !Number.isInteger((edge as { Index?: unknown }).Index))) {
@@ -274,9 +291,35 @@ export function readFootprintRoofInStore(store: IfcDataStore, roofId: number, vi
   const overhang = view.getPropertyValue(roofId, ROOF_FOOTPRINT_PSET, 'Overhang');
   const thickness = view.getPropertyValue(roofId, ROOF_FOOTPRINT_PSET, 'Thickness');
   if (!footprint || !slopes || typeof overhang !== 'number' || typeof thickness !== 'number') return null;
+  const recordedBreaks = view.getPropertyValue(roofId, ROOF_FOOTPRINT_PSET, 'EdgeBreaks');
+  const breaks = recordedBreaks === null || recordedBreaks === undefined ? undefined : parseBreaks(recordedBreaks);
+  if (breaks === null) return null;
   const type = roof.attributes[8];
   const PredefinedType = (typeof type === 'string' ? type.replace(/\./g, '') : 'NOTDEFINED') as RoofShapeType;
-  return { Footprint: footprint, EdgeSlopes: slopes, Overhang: overhang, Thickness: thickness, PredefinedType };
+  return { Footprint: footprint, EdgeSlopes: slopes, ...(breaks ? { EdgeBreaks: breaks } : {}), Overhang: overhang, Thickness: thickness, PredefinedType };
+}
+
+function parseBreaks(value: unknown): RoofEdgeBreak[][] | null {
+  if (typeof value !== 'string') return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) return null;
+    const out: RoofEdgeBreak[][] = [];
+    for (const turns of parsed) {
+      if (!Array.isArray(turns)) return null;
+      const edge: RoofEdgeBreak[] = [];
+      for (const item of turns) {
+        const height: unknown = item?.Height, slope: unknown = item?.Slope;
+        if (typeof height !== 'number' || typeof slope !== 'number' || !Number.isFinite(height) || !Number.isFinite(slope)) return null;
+        edge.push({ Height: height, Slope: slope });
+      }
+      out.push(edge);
+    }
+    return out;
+  } catch (error) {
+    console.warn('[roof] unreadable IfcLite_RoofFootprint EdgeBreaks', error);
+    return null;
+  }
 }
 
 /**
@@ -298,7 +341,11 @@ export function editFootprintRoofInStore(store: IfcDataStore, editor: StoreEdito
       }
       slopes[Index] = patch.Edge.Slope;
     }
-    const next = { Footprint: current.Footprint, EdgeSlopes: slopes, Overhang: patch.Overhang ?? current.Overhang, Thickness: patch.Thickness ?? current.Thickness };
+    const breaks = patch.EdgeBreaks ?? current.EdgeBreaks;
+    const next = {
+      Footprint: current.Footprint, EdgeSlopes: slopes, ...(breaks ? { EdgeBreaks: breaks } : {}),
+      Overhang: patch.Overhang ?? current.Overhang, Thickness: patch.Thickness ?? current.Thickness,
+    };
 
     const reader = new AnchorEntityReader(store, view);
     const roof = reader.entity(roofId)!;
@@ -309,13 +356,13 @@ export function editFootprintRoofInStore(store: IfcDataStore, editor: StoreEdito
     const body = emitFootprintRoofBody(draft, scale, oldBodies[0].context, next);
     const oldPlan = planFootprintRoofNative(scale, current);
     const oldEdges = parts.length
-      ? parts.flatMap((id, index) => oldBodies[index].solids.map(() => Number(reader.entity(id)?.attributes[7])))
-      : oldPlan.planes.length ? oldPlan.planes.map(plane => plane.edge) : [-1];
-    if (oldEdges.some(edge => !Number.isInteger(edge))) throw new Error('Unreadable roof plane edge tag');
-    const newEdges = body.plan.planes.length ? body.plan.planes.map(plane => plane.edge) : [-1];
+      ? parts.flatMap((id, index) => oldBodies[index].solids.map(() => reader.entity(id)?.attributes[7]))
+      : oldPlan.planes.length ? oldPlan.planes.map(roofPlaneTag) : ['-1'];
+    if (oldEdges.some(edge => typeof edge !== 'string' || !/^-?\d+(\.\d+)?$/.test(edge))) throw new Error('Unreadable roof plane edge tag');
+    const newEdges = body.plan.planes.length ? body.plan.planes.map(roofPlaneTag) : ['-1'];
     carryPlaneStyles(store, draft, new Map(replaced.map((id, index): [number, readonly number[]] => {
-      const edge = oldEdges[index], next = newEdges.indexOf(edge);
-      return [id, edge === -1 ? body.solidIds : newEdges[0] === -1 ? [body.solidIds[0]] : next < 0 ? [] : [body.solidIds[next]]];
+      const edge = oldEdges[index], next = newEdges.indexOf(String(edge));
+      return [id, edge === '-1' ? body.solidIds : newEdges[0] === '-1' ? [body.solidIds[0]] : next < 0 ? [] : [body.solidIds[next]]];
     })));
     if (roof.attributes.length > 8) draft.setPositionalAttribute(roofId, 8, `.${body.plan.shapeType}.`);
     const definition = { ...next, PredefinedType: body.plan.shapeType };
@@ -336,5 +383,7 @@ export function footprintDefinition(footprint: Array<[number, number]>, fields: 
   if (!Array.isArray(slopes)) throw new Error('EdgeSlopes must be an array of radians, one per footprint edge');
   const overhang = fields.Overhang === undefined ? 0 : fields.Overhang;
   if (typeof overhang !== 'number') throw new Error('Overhang must be a length in metres');
-  return { Footprint: points, EdgeSlopes: [...slopes], Overhang: overhang, Thickness: thickness };
+  if (fields.EdgeBreaks !== undefined && !Array.isArray(fields.EdgeBreaks)) throw new Error('EdgeBreaks must be an array with one list of breaks per footprint edge');
+  const breaks = hasBreaks(fields.EdgeBreaks) ? fields.EdgeBreaks.map((turns) => turns.map((b) => ({ Height: b.Height, Slope: b.Slope }))) : undefined;
+  return { Footprint: points, EdgeSlopes: [...slopes], ...(breaks ? { EdgeBreaks: breaks } : {}), Overhang: overhang, Thickness: thickness };
 }

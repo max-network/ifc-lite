@@ -16,6 +16,9 @@
  * - a split event: a reflex vertex runs into another edge and the wavefront splits;
  * - a zip: two anti-parallel lines meet (a ridge or a narrow wing closing up),
  *   and the overlapping run of the two edges ends there.
+ * - a speed change: a line takes a new speed from a given time on, as a gable
+ *   end turns into a half-hip or a mansard's steep lower slope into its upper one.
+ *   The line's run so far closes its face and a new face starts on it.
  * A wavefront that has lost its area ends, and its last edges close their faces.
  *
  * The caller decides which polygons it trusts this with (the roof builder takes
@@ -34,6 +37,13 @@ export interface SkeletonLine {
   /** Line constant at τ = 0. */
   readonly k: number;
   /** Inward speed; 0 holds the line still. */
+  readonly s: number;
+}
+
+/** Line `line` moves at speed `s` from time `at` on. */
+export interface SkeletonSpeedChange {
+  readonly line: number;
+  readonly at: number;
   readonly s: number;
 }
 
@@ -65,21 +75,47 @@ function meet(l1: SkeletonLine, l2: SkeletonLine, t: number): SkeletonPoint | nu
   return [(c1 * l2.ny - l1.ny * c2) / det, (l1.nx * c2 - c1 * l2.nx) / det];
 }
 
+/** Every line a change makes, in the changes' order: the same normal, a constant that keeps the line continuous at the change. */
+function changedLines(lines: readonly SkeletonLine[], changes: readonly SkeletonSpeedChange[]): { all: SkeletonLine[]; from: number[] } {
+  const n = lines.length;
+  const all: SkeletonLine[] = [...lines];
+  const from = new Array<number>(changes.length).fill(-1);
+  const order = changes.map((_, j) => j).sort((a, b) => changes[a].line - changes[b].line || changes[a].at - changes[b].at);
+  const active = lines.map((_, i) => i);
+  let previous: SkeletonSpeedChange | null = null;
+  for (const j of order) {
+    const change = changes[j];
+    if (!Number.isInteger(change.line) || change.line < 0 || change.line >= n) throw new Error(`Speed change ${j} names no line`);
+    if (!Number.isFinite(change.at) || change.at <= 0 || !Number.isFinite(change.s) || change.s < 0) throw new Error(`Speed change ${j} needs a time after the start and a speed of 0 or more`);
+    if (previous && previous.line === change.line && change.at - previous.at <= EPS) throw new Error(`Line ${change.line} changes speed twice at one time`);
+    const before = all[active[change.line]];
+    all[n + j] = { nx: before.nx, ny: before.ny, k: before.k + (before.s - change.s) * change.at, s: change.s };
+    from[j] = active[change.line];
+    active[change.line] = n + j;
+    previous = change;
+  }
+  return { all, from };
+}
+
 /**
  * The faces of the weighted straight skeleton: `faces[i]` is the closed outline
  * swept by line i, as plan positions with the time each corner is reached.
  * Lines are given in counter-clockwise order; consecutive lines must not be parallel.
+ * Each speed change adds a face, `faces[lines.length + j]` for change j, empty
+ * when the wavefront closed before it.
  */
-export function weightedStraightSkeleton(lines: readonly SkeletonLine[]): SkeletonNode[][] {
-  const n = lines.length;
+export function weightedStraightSkeleton(input: readonly SkeletonLine[], changes: readonly SkeletonSpeedChange[] = []): SkeletonNode[][] {
+  const n = input.length;
   if (n < 3) throw new Error('A skeleton needs at least three edges');
+  const { all: lines, from } = changedLines(input, changes);
   // Normalise to a unit-sized problem so one tolerance fits every model unit.
-  const start = lines.map((_, i) => meet(lines[(i + n - 1) % n], lines[i], 0));
+  const start = input.map((_, i) => meet(input[(i + n - 1) % n], input[i], 0));
   if (start.some((p) => p === null)) throw new Error('Consecutive footprint edges are parallel');
   const pts = start as SkeletonPoint[];
   const cx = pts.reduce((sum, p) => sum + p[0], 0) / n, cy = pts.reduce((sum, p) => sum + p[1], 0) / n;
   const size = Math.max(...pts.map((p) => Math.hypot(p[0] - cx, p[1] - cy)), EPS);
   const L: SkeletonLine[] = lines.map((l) => ({ nx: l.nx, ny: l.ny, k: (l.k - l.nx * cx - l.ny * cy) / size, s: l.s }));
+  const pending = changes.map((change, j) => ({ t: change.at / size, from: from[j], to: n + j })).sort((a, b) => a.t - b.t);
 
   const nodes: Array<[number, number, number]> = [];
   const segments: Segment[] = [];
@@ -107,7 +143,7 @@ export function weightedStraightSkeleton(lines: readonly SkeletonLine[]): Skelet
   const nodeAt = (v: Vertex, t: number) => (nodes[v.node][2] === t ? v.node : addNode(...at(v, t), t));
   const link = (a: Vertex, b: Vertex) => { a.next = b; b.prev = a; };
 
-  const initial = L.map((_, i) => makeVertex((i + n - 1) % n, i, addNode(...meetOrThrow(L, i), 0)));
+  const initial = input.map((_, i) => makeVertex((i + n - 1) % n, i, addNode(...meetOrThrow(L, n, i), 0)));
   initial.forEach((v, i) => link(v, initial[(i + 1) % n]));
   initial.forEach((v, i) => segments.push({ face: i, from: v.node, to: initial[(i + 1) % n].node }));
   if (initial.some((v) => v.parallel)) throw new Error('Consecutive footprint edges are parallel');
@@ -241,11 +277,33 @@ export function weightedStraightSkeleton(lines: readonly SkeletonLine[]): Skelet
         }
       }
     }
+    const next = pending[0];
+    if (next) offer(Math.max(now, next.t), -1, () => speedChange(next.t));
     if (!best) throw new Error('The roof skeleton cannot close this footprint');
     const chosen = best as { t: number; run: () => void };
     now = Math.max(now, chosen.t);
     chosen.run();
     settle();
+  }
+
+  /** Every line changing at time t closes its face along the wavefront and goes on as its new line. */
+  function speedChange(t: number) {
+    const swap = new Map<number, number>();
+    while (pending.length > 0 && pending[0].t <= t + EPS) {
+      const change = pending.shift()!;
+      swap.set(change.from, change.to);
+    }
+    for (const cycle of cycles()) {
+      if (!cycle.some((v) => swap.has(v.a) || swap.has(v.b))) continue;
+      const ends = new Map(cycle.map((v) => [v, nodeAt(v, now)] as const));
+      for (const u of cycle) {
+        const to = swap.get(u.b), a = ends.get(u)!, b = ends.get(u.next)!;
+        if (to !== undefined && a !== b) segments.push({ face: u.b, from: a, to: b }, { face: to, from: a, to: b });
+      }
+      const renewed = new Map(cycle.map((v) => [v, swap.has(v.a) || swap.has(v.b) ? add(makeVertex(swap.get(v.a) ?? v.a, swap.get(v.b) ?? v.b, ends.get(v)!)) : v] as const));
+      for (const v of cycle) link(renewed.get(v)!, renewed.get(v.next)!);
+      for (const [old, fresh] of renewed) if (old !== fresh) drop(old, ends.get(old)!);
+    }
   }
 
   function edgeEvent(u: Vertex) {
@@ -272,8 +330,9 @@ export function weightedStraightSkeleton(lines: readonly SkeletonLine[]): Skelet
 
   // Chain each face's segments into one closed outline.
   const faces: SkeletonNode[][] = [];
-  for (let face = 0; face < n; face++) {
+  for (let face = 0; face < lines.length; face++) {
     const own = segments.filter((s) => s.face === face && s.from !== s.to);
+    if (own.length === 0 && face >= n) { faces.push([]); continue; }
     const ring = chain(own, face);
     const outline = ring.map((id) => [nodes[id][0] * size + cx, nodes[id][1] * size + cy, nodes[id][2] * size] as const);
     const line = lines[face];
@@ -288,8 +347,8 @@ export function weightedStraightSkeleton(lines: readonly SkeletonLine[]): Skelet
   return faces;
 }
 
-function meetOrThrow(lines: readonly SkeletonLine[], i: number): [number, number] {
-  const p = meet(lines[(i + lines.length - 1) % lines.length], lines[i], 0);
+function meetOrThrow(lines: readonly SkeletonLine[], n: number, i: number): [number, number] {
+  const p = meet(lines[(i + n - 1) % n], lines[i], 0);
   if (!p) throw new Error('Consecutive footprint edges are parallel');
   return [p[0], p[1]];
 }
