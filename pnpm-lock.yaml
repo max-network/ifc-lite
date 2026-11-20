@@ -2874,7 +2874,7 @@ importers:
         version: link:../encoding
       zod:
         specifier: ^4.6.6
-        version: 4.6.7
+        version: 4.6.6
     devDependencies:
       '@ifc-lite/codegen':
         specifier: workspace:^
@@ -2884,7 +2884,7 @@ importers:
         version: link:../parser
       '@mergifyio/vitest':
         specifier: ^2026.11.8
-        version: 2026.11.8(vitest@5.1.0(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(happy-dom@21.0.4)(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))
+        version: 2026.11.16(vitest@5.0.5(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(happy-dom@21.0.4)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))
       '@types/node':
         specifier: ^26.6.6
         version: 26.6.6
@@ -2899,7 +2899,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^5.0.3
-        version: 5.1.0(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(happy-dom@21.0.4)(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 5.0.5(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(happy-dom@21.0.4)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/viewer:
     dependencies:
@@ -3661,8 +3661,18 @@ packages:
     resolution: {integrity: sha512-To80Jmq2xxZRZb4Zvsp4w/W1LJt5c++I56+G8/5+1oa3zoKipHJ4uhmuSYsxhJgdrvS8A1g1teD/GR17VEuQ3g==}
     engines: {node: '>=22.0.0'}
 
+  '@mergifyio/ci-core@2026.11.16':
+    resolution: {integrity: sha512-CyjirVklJHkpSUpJAAACfFbh1FLQ7rj4MVOaLjN3WOha4OWp6qxxRAb/Hj0qwuV+mSm2I2u7Dz6whSQZnyEQ6w==}
+    engines: {node: '>=22.0.0'}
+
   '@mergifyio/ci-native-darwin-arm64@2026.10.11':
     resolution: {integrity: sha512-GIcSIY4tBa64CUN6YGjAlOjEdl47bOByYUKcqyV1E8K07BpMy++2LGj/LQ+13YaeawTPs2NA1S+grp7L31zepQ==}
+    engines: {node: '>=22.0.0'}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@mergifyio/ci-native-darwin-arm64@2026.11.16':
+    resolution: {integrity: sha512-oF3vtEjbLHlcPxaPzpLE0zX5oBXkDuFl5DrAHsif2BLRGNhq1k22j2tkm/Dw36MZD3R1ZoySM2NTMKlWcWU1EA==}
     engines: {node: '>=22.0.0'}
     cpu: [arm64]
     os: [darwin]
@@ -3673,8 +3683,20 @@ packages:
     cpu: [x64]
     os: [darwin]
 
+  '@mergifyio/ci-native-darwin-x64@2026.11.16':
+    resolution: {integrity: sha512-cIQqE6VTxLTuGu7QGN9s+FPOvHx1I4EnRvUeIRVBKHvuCMSNb/BLlRZtTTXxCqSPUHY+4UTzC9NFFvSSpawHYw==}
+    engines: {node: '>=22.0.0'}
+    cpu: [x64]
+    os: [darwin]
+
   '@mergifyio/ci-native-linux-arm64-gnu@2026.10.11':
     resolution: {integrity: sha512-O+7Rg4QykHS+9wvHx/4i4pCqyJLhfTWaSN/HG51qK4QkDFJOyec/XKcBsLsNVPIsEestmMqOYm86GrXE6uArQQ==}
+    engines: {node: '>=22.0.0'}
+    cpu: [arm64]
+    os: [linux]
+
+  '@mergifyio/ci-native-linux-arm64-gnu@2026.11.16':
+    resolution: {integrity: sha512-EhtnPzFPeIUdC654eCMthdNoYPyiJvH8l/VQJTryMkQ7GSuUrLLA9ZbETq+iIS59VlzmRtSZackJQlFxws//JA==}
     engines: {node: '>=22.0.0'}
     cpu: [arm64]
     os: [linux]
@@ -3685,8 +3707,20 @@ packages:
     cpu: [arm64]
     os: [linux]
 
+  '@mergifyio/ci-native-linux-arm64-musl@2026.11.16':
+    resolution: {integrity: sha512-hMKaj9DQ7Otavucvbo9NrOF0ACC/DVSEA3euivMibv3yVRdBiNHzSr3YeZNDZ6N448jgeEB8YUcV9vNdvAy7EQ==}
+    engines: {node: '>=22.0.0'}
+    cpu: [arm64]
+    os: [linux]
+
   '@mergifyio/ci-native-linux-x64-gnu@2026.10.11':
     resolution: {integrity: sha512-hygCq+utqy6vsYZY62Y4MnF+LCX2rlsaoX2y1KkKQK5S+GBEmSywEdqFgluJp8hUvKSP9jExR/KpzJtTE31NeQ==}
+    engines: {node: '>=22.0.0'}
+    cpu: [x64]
+    os: [linux]
+
+  '@mergifyio/ci-native-linux-x64-gnu@2026.11.16':
+    resolution: {integrity: sha512-cqFtl0tgpIpQDrG5Jjd762fFbmgrMAP1la/KOprdHzeWa6HBKOLBAGsIU7BAFc9lFg1uwjVjDvtdi0RYjwySyA==}
     engines: {node: '>=22.0.0'}
     cpu: [x64]
     os: [linux]
@@ -3697,14 +3731,30 @@ packages:
     cpu: [x64]
     os: [linux]
 
+  '@mergifyio/ci-native-linux-x64-musl@2026.11.16':
+    resolution: {integrity: sha512-eXikq/yzxDCDPFXB1wGh4eM+mOtvZkeglsp7apzS8CF8E0kkS9kWlaBOUBDXmYnidkQ69F8slkTF7Nkx77ygtQ==}
+    engines: {node: '>=22.0.0'}
+    cpu: [x64]
+    os: [linux]
+
   '@mergifyio/ci-native-win32-x64-msvc@2026.10.11':
     resolution: {integrity: sha512-BlGZnQ/qAVndG7qZivq8hQ+qnUb6EgpUPygoPk8zfvCg0JVzhYfZtZQLlnYsugWZTB2vQOvSE986isFYjYbRXA==}
     engines: {node: '>=22.0.0'}
     cpu: [x64]
     os: [win32]
 
+  '@mergifyio/ci-native-win32-x64-msvc@2026.11.16':
+    resolution: {integrity: sha512-Q0K6C5z5U1D0B1uQ/ii3F45APrHsonHY3kMjrbsM8WBHdehCG64ybNUOg3OkPtrLUk1BYcd8D0k9HXubJqRRDw==}
+    engines: {node: '>=22.0.0'}
+    cpu: [x64]
+    os: [win32]
+
   '@mergifyio/ci-native@2026.10.11':
     resolution: {integrity: sha512-ppS4I6yDpytXmKvJTInC3kCV9VFy8VwaFmeWZHp08TujOMx+7tBAL4tiBWpruRBsMuEQxPFLsvwsUHDzgrKqlA==}
+    engines: {node: '>=22.0.0'}
+
+  '@mergifyio/ci-native@2026.11.16':
+    resolution: {integrity: sha512-tDER9rQJ9QFx1voEAQ2LrlQRjdxdogHmbkcTmRGPnktrnO3qNBAN2wCKJbRRVmo4jxm7CBifrD7X/INCHswu6g==}
     engines: {node: '>=22.0.0'}
 
   '@mergifyio/playwright@2026.10.11':
@@ -3715,6 +3765,12 @@ packages:
 
   '@mergifyio/vitest@2026.10.11':
     resolution: {integrity: sha512-Rvo14zOiEG+LqVUr5vSy2H2ZvbN7wMYU2C1V3VDnQBWi6nNtgymmdjHbH7pn9AYjHwjEi8uXUBpHsHSD7PNZ4A==}
+    engines: {node: '>=22.0.0'}
+    peerDependencies:
+      vitest: ^5.0.3
+
+  '@mergifyio/vitest@2026.11.16':
+    resolution: {integrity: sha512-2hf7GLxY3I0/17firRMtgGN1MtIMxc/yXvcMD/VTMTkdZ2WpH0iZO5vfo1Do3In9EimUeYKaLWh2Y64XMnrOTg==}
     engines: {node: '>=22.0.0'}
     peerDependencies:
       vitest: ^5.0.3
@@ -8885,25 +8941,50 @@ snapshots:
     dependencies:
       '@mergifyio/ci-native': 2026.10.11
 
+  '@mergifyio/ci-core@2026.11.16':
+    dependencies:
+      '@mergifyio/ci-native': 2026.11.16
+
   '@mergifyio/ci-native-darwin-arm64@2026.10.11':
+    optional: true
+
+  '@mergifyio/ci-native-darwin-arm64@2026.11.16':
     optional: true
 
   '@mergifyio/ci-native-darwin-x64@2026.10.11':
     optional: true
 
+  '@mergifyio/ci-native-darwin-x64@2026.11.16':
+    optional: true
+
   '@mergifyio/ci-native-linux-arm64-gnu@2026.10.11':
+    optional: true
+
+  '@mergifyio/ci-native-linux-arm64-gnu@2026.11.16':
     optional: true
 
   '@mergifyio/ci-native-linux-arm64-musl@2026.10.11':
     optional: true
 
+  '@mergifyio/ci-native-linux-arm64-musl@2026.11.16':
+    optional: true
+
   '@mergifyio/ci-native-linux-x64-gnu@2026.10.11':
+    optional: true
+
+  '@mergifyio/ci-native-linux-x64-gnu@2026.11.16':
     optional: true
 
   '@mergifyio/ci-native-linux-x64-musl@2026.10.11':
     optional: true
 
+  '@mergifyio/ci-native-linux-x64-musl@2026.11.16':
+    optional: true
+
   '@mergifyio/ci-native-win32-x64-msvc@2026.10.11':
+    optional: true
+
+  '@mergifyio/ci-native-win32-x64-msvc@2026.11.16':
     optional: true
 
   '@mergifyio/ci-native@2026.10.11':
@@ -8915,6 +8996,16 @@ snapshots:
       '@mergifyio/ci-native-linux-x64-gnu': 2026.10.11
       '@mergifyio/ci-native-linux-x64-musl': 2026.10.11
       '@mergifyio/ci-native-win32-x64-msvc': 2026.10.11
+
+  '@mergifyio/ci-native@2026.11.16':
+    optionalDependencies:
+      '@mergifyio/ci-native-darwin-arm64': 2026.11.16
+      '@mergifyio/ci-native-darwin-x64': 2026.11.16
+      '@mergifyio/ci-native-linux-arm64-gnu': 2026.11.16
+      '@mergifyio/ci-native-linux-arm64-musl': 2026.11.16
+      '@mergifyio/ci-native-linux-x64-gnu': 2026.11.16
+      '@mergifyio/ci-native-linux-x64-musl': 2026.11.16
+      '@mergifyio/ci-native-win32-x64-msvc': 2026.11.16
 
   '@mergifyio/playwright@2026.10.11(@playwright/test@1.64.1)':
     dependencies:
@@ -8929,6 +9020,11 @@ snapshots:
   '@mergifyio/vitest@2026.10.11(vitest@5.0.5(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(happy-dom@21.0.4)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))':
     dependencies:
       '@mergifyio/ci-core': 2026.10.11
+      vitest: 5.0.5(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(happy-dom@21.0.4)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
+  '@mergifyio/vitest@2026.11.16(vitest@5.0.5(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(happy-dom@21.0.4)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))':
+    dependencies:
+      '@mergifyio/ci-core': 2026.11.16
       vitest: 5.0.5(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(happy-dom@21.0.4)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   '@napi-rs/canvas-android-arm64@1.0.10':
