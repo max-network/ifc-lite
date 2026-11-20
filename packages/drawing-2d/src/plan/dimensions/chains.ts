@@ -13,7 +13,7 @@ import {
 import { principalFrame, sideFrame, type PlanFrame } from './frame.js';
 import { facadeRuns, facadeStations, type FacadeFilling, type FacadeStation } from './facade.js';
 import { outlineSpan, roomSpan, roomStations, scanIntervals, type LocalPolygon, type LocalSegment, type ScanAxis } from './interior.js';
-import { chainCrossings, isPlanObstacle, obstacleSegments } from './obstacles.js';
+import { boxClear, chainCrossings, isPlanObstacle, obstacleSegments } from './obstacles.js';
 import type { PlanDimensionChain, PlanDimensionKind, PlanDimensionOptions, PlanDimensionSide, PlanGridAxis } from './types.js';
 
 const SIDES: readonly PlanDimensionSide[] = ['top', 'right', 'bottom', 'left'];
@@ -39,12 +39,16 @@ function uprightUp(direction: Point2D): Point2D {
   return { x: along.y, y: -along.x };
 }
 
-function chainSegments(anchors: readonly Point2D[], direction: Point2D, line: Point2D, ctx: ChainContext): LinearDimension[] {
+/** Whether a text box centred at `center`, `halfAlong` long and `halfAcross` high either side, is free to draw on. */
+type TextClear = (center: Point2D, halfAlong: number, halfAcross: number) => boolean;
+
+function chainSegments(anchors: readonly Point2D[], direction: Point2D, line: Point2D, ctx: ChainContext, textClear?: TextClear): LinearDimension[] {
   const n = { x: -direction.y, y: direction.x };
   const c = line.x * n.x + line.y * n.y;
   const m = (paperMm: number) => (paperMm * ctx.scale) / 1000;
   const up = uprightUp(direction);
   const drop = m(DIMENSION_PAPER_MM.textHeight + 2 * DIMENSION_PAPER_MM.textGap);
+  const lift = m(DIMENSION_PAPER_MM.textGap + DIMENSION_PAPER_MM.textHeight / 2);
   const segments: LinearDimension[] = [];
   let narrowRun = 0;
   for (let k = 0; k + 1 < anchors.length; k++) {
@@ -59,9 +63,14 @@ function chainSegments(anchors: readonly Point2D[], direction: Point2D, line: Po
     } else {
       const clear = length / 2 + m(textMm / 2 + DIMENSION_PAPER_MM.textGap);
       const last = k + 2 === anchors.length;
-      if (k === 0 && !last) segment.textShift = { x: -direction.x * clear, y: -direction.y * clear };
-      else if (last && k > 0) segment.textShift = { x: direction.x * clear, y: direction.y * clear };
-      else if (narrowRun % 2 === 0) segment.textShift = { x: -up.x * drop, y: -up.y * drop };
+      const before = { x: -direction.x * clear, y: -direction.y * clear };
+      const after = { x: direction.x * clear, y: direction.y * clear };
+      const below = { x: -up.x * drop, y: -up.y * drop };
+      const options = k === 0 && !last ? [before, below] : last && k > 0 ? [after, below] : narrowRun % 2 === 0 ? [below, undefined] : [undefined, below];
+      const onLine = { x: mid.x + n.x * (c - (mid.x * n.x + mid.y * n.y)) + up.x * lift, y: mid.y + n.y * (c - (mid.x * n.x + mid.y * n.y)) + up.y * lift };
+      const free = (shift: Point2D | undefined) => !textClear || textClear({ x: onLine.x + (shift?.x ?? 0), y: onLine.y + (shift?.y ?? 0) }, m(textMm / 2), m(DIMENSION_PAPER_MM.textHeight / 2));
+      const shift = options.find(free) ?? options[0];
+      if (shift) segment.textShift = shift;
       narrowRun++;
     }
     segments.push(segment);
@@ -130,7 +139,12 @@ function interiorChains(polygons: readonly LocalPolygon[], labels: readonly Room
     const local = (s: number): Point2D => (axis === 'u' ? { x: s, y: at } : { x: at, y: s });
     const anchors = stations.map((s) => ctx.frame.toDrawing(local(s)));
     const direction = axis === 'u' ? ctx.frame.u : ctx.frame.v;
-    chains.push({ kind: 'interior', direction, segments: chainSegments(anchors, direction, anchors[0], ctx) });
+    const textClear: TextClear = (center, halfAlong, halfAcross) => {
+      const p = ctx.frame.toLocal(center);
+      const [hx, hy] = axis === 'u' ? [halfAlong, halfAcross] : [halfAcross, halfAlong];
+      return boxClear(obstacles, p.x - hx, p.y - hy, p.x + hx, p.y + hy);
+    };
+    chains.push({ kind: 'interior', direction, segments: chainSegments(anchors, direction, anchors[0], ctx, obstacles.length > 0 ? textClear : undefined) });
   };
   const band = m(DIMENSION_PAPER_MM.textHeight + 2 * DIMENSION_PAPER_MM.textGap);
   const step = m(DIMENSION_PAPER_MM.textHeight);
@@ -164,8 +178,9 @@ function interiorChains(polygons: readonly LocalPolygon[], labels: readonly Room
     const wanted = inRoom(from - clearance, room);
     if (obstacles.length === 0) return wanted;
     const reach = room ? room[1] - room[0] : 0;
-    const candidates = [from - clearance, from + clearance];
-    for (let k = 1; k * step < reach; k++) candidates.push(from - clearance - k * step, from + clearance + k * step);
+    const far = clearance + band;
+    const candidates = [from - clearance, from + far];
+    for (let k = 1; k * step < reach; k++) candidates.push(from - clearance - k * step, from + far + k * step);
     let best = { at: wanted, hits: Infinity };
     for (const candidate of candidates) {
       const at = inRoom(candidate, room);

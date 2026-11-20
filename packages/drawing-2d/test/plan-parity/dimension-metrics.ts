@@ -5,7 +5,7 @@
 /** Dimension-chain metrics of one storey plan, measured from the drawing's own geometry. */
 
 import type { Drawing2D, Point2D } from '../../src/types.js';
-import { isPlanFabric, isPlanObstacle, linearDimensionLength, type PlanDimensionChain } from '../../src/index.js';
+import { dimensionTextWidthMm, isPlanFabric, isPlanObstacle, linearDimensionGraphics, linearDimensionLength, type PlanDimensionChain } from '../../src/index.js';
 
 export interface DimensionMetrics {
   sidesDimensioned: number;
@@ -18,6 +18,7 @@ export interface DimensionMetrics {
   spacesLabelled: number;
   spacesCrossedBothWays: number;
   interiorObstacleCrossings: number;
+  interiorTextsOnObstacles: number;
 }
 
 const JAMB_TOLERANCE = 0.05;
@@ -58,6 +59,32 @@ function dimensionLine(chain: PlanDimensionChain, segment: PlanDimensionChain['s
   const c = segment.offset + dot(mid, n);
   const onto = (p: Point2D): Point2D => ({ x: p.x + n.x * (c - dot(p, n)), y: p.y + n.y * (c - dot(p, n)) });
   return [onto(segment.a), onto(segment.b)];
+}
+
+function segmentInBox([p, q]: Segment, half: Point2D): boolean {
+  let t0 = 0;
+  let t1 = 1;
+  const d = { x: q.x - p.x, y: q.y - p.y };
+  for (const [step, room] of [[-d.x, p.x + half.x], [d.x, half.x - p.x], [-d.y, p.y + half.y], [d.y, half.y - p.y]]) {
+    if (Math.abs(step) < 1e-12) {
+      if (room < 0) return false;
+      continue;
+    }
+    const t = room / step;
+    if (step < 0) t0 = Math.max(t0, t);
+    else t1 = Math.min(t1, t);
+    if (t0 > t1) return false;
+  }
+  return true;
+}
+
+function textOnObstacle(chain: PlanDimensionChain, segment: PlanDimensionChain['segments'][number], scale: number, obstacles: readonly Segment[]): boolean {
+  const { text } = linearDimensionGraphics(segment, { paperScale: scale, format: (m) => String(Math.round(m * 1000)) });
+  const along = chain.direction;
+  const across = { x: -along.y, y: along.x };
+  const local = (p: Point2D): Point2D => ({ x: dot({ x: p.x - text.at.x, y: p.y - text.at.y }, along), y: dot({ x: p.x - text.at.x, y: p.y - text.at.y }, across) });
+  const half = { x: (dimensionTextWidthMm(text.value) * scale) / 2000, y: text.heightM / 2 };
+  return obstacles.some(([p, q]) => segmentInBox([local(p), local(q)], half));
 }
 
 function stations(chain: PlanDimensionChain): number[] {
@@ -139,10 +166,11 @@ export function measureDimensions(drawing: Drawing2D, storeyElements: ReadonlySe
   }).length;
 
   const obstacles: Segment[] = [
-    ...drawing.lines.filter((l) => l.visibility === 'visible' && isPlanObstacle(l.ifcType)).map((l): Segment => [l.line.start, l.line.end]),
+    ...drawing.lines.filter((l) => isPlanObstacle(l.ifcType)).map((l): Segment => [l.line.start, l.line.end]),
     ...drawing.cutPolygons.filter((p) => isPlanObstacle(p.ifcType)).flatMap((p) => ringSegments(p.polygon.outer)),
   ];
   const interiorObstacleCrossings = interior.flatMap((chain) => chain.segments.map((s) => dimensionLine(chain, s))).filter((line) => obstacles.some((o) => crosses(line, o))).length;
+  const interiorTextsOnObstacles = interior.flatMap((chain) => chain.segments.filter((s) => textOnObstacle(chain, s, drawing.config.scale, obstacles))).length;
 
   return {
     sidesDimensioned: overall.size,
@@ -155,5 +183,6 @@ export function measureDimensions(drawing: Drawing2D, storeyElements: ReadonlySe
     spacesLabelled: spaceLabels.length,
     spacesCrossedBothWays: crossed,
     interiorObstacleCrossings,
+    interiorTextsOnObstacles,
   };
 }
