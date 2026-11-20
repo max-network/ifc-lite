@@ -1,0 +1,106 @@
+name: Publish max-network packages
+
+# Publishes the packages this fork changes to GitHub Packages under
+# @max-network (the scope must equal the repository owner), named and
+# versioned by .github/max-network-packages.json. Dependencies keep their
+# @ifc-lite/* names, so consumers map them with npm `overrides`.
+#
+# Releasing is bumping `prerelease` in that file on max-network/main; a version
+# the registry already has is skipped, so a re-run publishes nothing twice.
+# Auth follows the org convention: GH_PACKAGES_TOKEN first, then the workflow
+# token, whichever the registry accepts.
+
+on:
+  push:
+    branches: [max-network/main]
+    paths:
+      - .github/max-network-packages.json
+  workflow_dispatch:
+    inputs:
+      packages:
+        description: "Comma-separated directories under packages/ (empty: every configured package)"
+        type: string
+        default: ""
+
+concurrency:
+  group: max-network-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.repository == 'max-network/ifc-lite'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Fetch the prebuilt wasm
+        run: pnpm build:wasm:fetch
+
+      - name: Select packages
+        id: select
+        env:
+          REQUESTED: ${{ inputs.packages }}
+        run: |
+          set -euo pipefail
+          LIST=$(node -e "
+            const all = require('./.github/max-network-packages.json').packages;
+            const asked = (process.env.REQUESTED || '').split(',').map(s => s.trim()).filter(Boolean);
+            const bad = asked.filter(p => !all.includes(p));
+            if (bad.length) { console.error('Not configured: ' + bad.join(', ')); process.exit(1); }
+            console.log((asked.length ? asked : all).join(','));
+          ")
+          FILTERS=$(node -e "console.log(process.argv[1].split(',').map(d => '--filter=' + require('./packages/' + d + '/package.json').name).join(' '))" "$LIST")
+          echo "list=$LIST" >> "$GITHUB_OUTPUT"
+          echo "filters=$FILTERS" >> "$GITHUB_OUTPUT"
+
+      - name: Build, typecheck and test the selected packages
+        run: pnpm turbo build typecheck test ${{ steps.select.outputs.filters }}
+
+      - name: Publish
+        env:
+          PAT: ${{ secrets.GH_PACKAGES_TOKEN }}
+          WORKFLOW_TOKEN: ${{ github.token }}
+          LIST: ${{ steps.select.outputs.list }}
+        run: |
+          set -euo pipefail
+          for label in GH_PACKAGES_TOKEN "workflow token"; do
+            case "$label" in
+              GH_PACKAGES_TOKEN) token="${PAT:-}" ;;
+              *)                 token="$WORKFLOW_TOKEN" ;;
+            esac
+            [ -n "$token" ] || continue
+            printf '@max-network:registry=https://npm.pkg.github.com\n//npm.pkg.github.com/:_authToken=%s\n' "$token" > "$HOME/.npmrc"
+            set +e
+            OUT=$(node scripts/max-network/publish-fork-packages.mjs --packages="$LIST" 2>&1)
+            CODE=$?
+            set -e
+            echo "$OUT"
+            if [ "$CODE" -eq 0 ]; then
+              echo "registry auth: $label"
+              printf '%s\n' "$OUT" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            if ! printf '%s' "$OUT" | grep -qiE "E401|E403|ENEEDAUTH|permission_denied|40[13] (Unauthorized|Forbidden)"; then
+              exit "$CODE"
+            fi
+            echo "::warning::The registry refused $label, trying the next credential."
+          done
+          echo "::error::No credential could publish to GitHub Packages."
+          exit 1
