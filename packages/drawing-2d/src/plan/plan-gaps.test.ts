@@ -244,12 +244,24 @@ describe('goal 5: cut walls are hatched by material category', () => {
     expect(classifyMaterialName('Xyzzy')).toBeUndefined();
   });
 
+  it('classifies roof coverings as roofing ahead of the masonry and concrete words they contain', () => {
+    for (const name of ['Clay roof tiles', 'Tondachziegel', 'Dachziegel Biberschwanz', 'Concrete roof tiles', 'Betondachstein',
+      'Dachstein', 'Pantile', 'Bitumen shingles', 'Natural slate', 'Schiefer', 'Tuile terre cuite', 'Ardoise', 'Keramische dakpan']) {
+      expect(classifyMaterialName(name), name).toBe('roofing');
+    }
+    expect(classifyMaterialName('Ziegel')).toBe('masonry');
+    expect(classifyMaterialName('Concrete C25/30')).toBe('concrete');
+    expect(classifyMaterialName('Dachdämmung Steinwolle')).toBe('insulation');
+  });
+
   it('switches the hatch pattern with the material category of the cut element', async () => {
     const walls = [box(1, 'IfcWall', [0, 0, 0], [4, 3, 0.3]), box(2, 'IfcWall', [0, 0, 1], [4, 3, 1.3])];
     const drawing = await generateStoreyPlan(walls, { storeyElevation: 0, generator: fast });
     const svg = exportToSVG(drawing, { materialCategories: new Map([[1, 'insulation'], [2, 'concrete']]) });
     expect(svg).toMatch(/data-entity-id="1"[^>]*data-hatch="insulation"/);
     expect(svg).toMatch(/data-entity-id="2"[^>]*data-hatch="concrete"/);
+    const roof = exportToSVG(drawing, { materialCategories: new Map([[1, 'roofing']]) });
+    expect(roof).toMatch(/data-entity-id="1"[^>]*data-hatch="roofing"/);
   });
 });
 

@@ -14,6 +14,7 @@ import { getHatchPattern, type HatchPattern } from '../styles.js';
 export type MaterialCategory =
   | 'concrete'
   | 'masonry'
+  | 'roofing'
   | 'insulation'
   | 'timber'
   | 'steel'
@@ -25,10 +26,12 @@ export type MaterialCategory =
 /**
  * Name keywords per category (English, German, French, Dutch). Order matters: a more
  * specific family wins over a word it contains ("Steinwolle" is insulation,
- * "Kalksandstein" and "Porenbeton" are masonry units).
+ * "Kalksandstein" and "Porenbeton" are masonry units, "Tondachziegel" and
+ * "Concrete roof tiles" are roof coverings).
  */
 const MATERIAL_KEYWORDS: ReadonlyArray<readonly [MaterialCategory, RegExp]> = [
   ['insulation', /insulat|d[äa]e?mm|mineral\s?wo|glas\s?wo|stein\s?wo|rock\s?wool|polystyr|\b(eps|xps|pur|pir)\b|isolant|isolation|isolatie/i],
+  ['roofing', /roof(ing)?\s?til|roofing|clay\s?til|pan\s?tile|shingle|\bslates?\b|dach\s?(ziegel|stein|pfanne|deckung)|tondach|betondach|biberschwanz|schiefer|\btuiles?\b|ardoise|bardeau|couverture|dakpan|dakbedekking|leisteen/i],
   ['masonry', /mason|brick|block|mauerwerk|ziegel|klinker|kalksand|calcium silicate|sand-?lime|kalkzandsteen|metselwerk|baksteen|poren\s?beton|gas\s?beton|aerated|ytong|brique|parpaing/i],
   ['concrete', /concrete|beton|screed|estrich|cement|zement|b[ée]ton/i],
   ['timber', /timber|wood|lumber|plywood|\bosb\b|\bclt\b|glulam|holz|sperrholz|brettsperr|brettschicht|bois|\bhout/i],
@@ -52,6 +55,7 @@ const line = { lineWeight: 0.18, strokeColor: '#000000' } as const;
 export const MATERIAL_HATCH_PATTERNS: Readonly<Record<MaterialCategory, HatchPattern>> = {
   concrete: { type: 'concrete', spacing: 3.0, angle: 45, ...line },
   masonry: { type: 'brick', spacing: 1.5, angle: 45, ...line },
+  roofing: { type: 'diagonal', spacing: 0.8, angle: 60, ...line },
   insulation: { type: 'insulation', spacing: 2.0, angle: 0, lineWeight: 0.13, strokeColor: '#000000' },
   timber: { type: 'wood', spacing: 2.0, angle: 135, ...line },
   steel: { type: 'steel', spacing: 1.0, angle: 45, lineWeight: 0.18, strokeColor: '#333333' },
