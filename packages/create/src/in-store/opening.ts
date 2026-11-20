@@ -65,6 +65,8 @@ export interface SlabOpeningInStoreParams extends OpeningCommonParams {
   Width: number;
   /** Size along the slab's local Y (metres). */
   Depth: number;
+  /** Turn of the rectangle about the slab's local Z, radians anticlockwise; Width then runs along (cos, sin). Default 0. */
+  Rotation?: number;
 }
 
 export type OpeningInStoreParams = WallOpeningInStoreParams | SlabOpeningInStoreParams;
@@ -173,6 +175,8 @@ function slabOpeningGeometry(editor: StoreEditor, host: HostAnchor, params: Open
   if (!('Position' in params)) throw new Error(`${op}: host #${host.hostId} is a slab; pass Position/Width/Depth (slab opening params)`);
   assertPositiveFinite([params.Width, params.Depth], `${op}: Width and Depth must be positive`);
   if (!params.Position.every(Number.isFinite)) throw new Error(`${op}: Position must be finite`);
+  const rotation = params.Rotation ?? 0;
+  if (!Number.isFinite(rotation)) throw new Error(`${op}: Rotation must be finite`);
 
   const bounds = host.hostBounds;
   const thickness = bounds ? bounds.max[2] - bounds.min[2] : null;
@@ -183,7 +187,7 @@ function slabOpeningGeometry(editor: StoreEditor, host: HostAnchor, params: Open
     toNativeLength(host, params.Position[0]),
     toNativeLength(host, params.Position[1]),
     centreZ - cutDepth / 2,
-  ]);
+  ], rotation === 0 ? undefined : [0, 0, 1], rotation === 0 ? undefined : [Math.cos(rotation), Math.sin(rotation), 0]);
   const profileId = emitRectangleProfile(editor, toNativeLength(host, params.Width), toNativeLength(host, params.Depth));
   const solidId = emitExtrudedSolid(editor, profileId, cutDepth);
   return { placementId, profileId, solidId, cutDepth };

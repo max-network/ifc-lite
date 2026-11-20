@@ -245,13 +245,13 @@ export function buildStoreNamespace(): NamespaceSchema {
       },
       {
         name: 'addRoof',
-        doc: 'Add an IfcRoof. Rectangle or polygon; flat unless EdgeSlopes/Overhang are given, then a roof by footprint: EdgeSlopes[i] (radians, 0 = gable end) slopes the edge from point i to point i+1, Overhang (metres) carries every edge out. Hip, gable, mono-pitch and L-shaped roofs.',
+        doc: 'Add an IfcRoof. Rectangle or polygon; flat unless EdgeSlopes/Overhang are given, then a roof by footprint: EdgeSlopes[i] (radians, 0 = gable end) slopes the edge from point i to point i+1, Overhang (metres) carries every edge out, EdgeBreaks[i] (list of { Height: metres above the eaves, Slope: radians }) turns edge i to another slope: a gable end turning sloped is a half-hip, a steep slope turning shallower a mansard. Hip, gable, mono-pitch, pyramid, half-hip, mansard and L-shaped roofs.',
         args: ['string', 'number', 'dump'],
         paramNames: ['modelId', 'storeyExpressId', 'params'],
         tsParamTypes: [
           'string',
           'number',
-          '{ Position: [number, number, number]; Width: number; Depth: number; Thickness: number; Profile?: "rectangle"; EdgeSlopes?: number[]; Overhang?: number; Name?: string; Description?: string; ObjectType?: string; Tag?: string } | { Profile: "polygon"; OuterCurve: Array<[number, number]>; Position?: [number, number, number]; Thickness: number; EdgeSlopes?: number[]; Overhang?: number; Name?: string; Description?: string; ObjectType?: string; Tag?: string }',
+          '{ Position: [number, number, number]; Width: number; Depth: number; Thickness: number; Profile?: "rectangle"; EdgeSlopes?: number[]; Overhang?: number; EdgeBreaks?: Array<Array<{ Height: number; Slope: number }>>; Name?: string; Description?: string; ObjectType?: string; Tag?: string } | { Profile: "polygon"; OuterCurve: Array<[number, number]>; Position?: [number, number, number]; Thickness: number; EdgeSlopes?: number[]; Overhang?: number; EdgeBreaks?: Array<Array<{ Height: number; Slope: number }>>; Name?: string; Description?: string; ObjectType?: string; Tag?: string }',
         ],
         tsReturn: '{ modelId: string; expressId: number }',
         call: (sdk, args) => {

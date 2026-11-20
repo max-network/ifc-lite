@@ -10,7 +10,7 @@ import type { SpatialAnchor } from './anchor.js';
 import { emitLocalPlacement, productGuid } from './_emit-helpers.js';
 import { refId } from './host-geometry-frame.js';
 import { AnchorEntityReader } from './resolve-anchor.js';
-import { signedArea, type FootprintRoofPlan } from './roof-footprint-plan.js';
+import { roofPlaneTag, signedArea, type FootprintRoofPlan } from './roof-footprint-plan.js';
 import type { FootprintRoofBody } from './roof-footprint.js';
 
 export const PART_TYPE = 'IfcLite_RoofPlane';
@@ -123,10 +123,10 @@ export function writeRoofPlaneParts(editor: StoreEditor, anchor: MeasureAnchor, 
   if (placement === null || context === null || typeof representationType !== 'string') throw new Error('Roof planes need a roof placement and Body');
   const plan = body.plan;
   const previous = partAssignment(reader, roofId);
-  const byEdge = new Map<number, number>();
+  const byEdge = new Map<string, number>();
   for (const id of previous?.parts ?? []) {
-    const edge = Number(reader.entity(id)?.attributes[7]);
-    if (!Number.isInteger(edge) || byEdge.has(edge)) throw new Error('Ambiguous managed roof plane edge');
+    const edge = reader.entity(id)?.attributes[7];
+    if (typeof edge !== 'string' || byEdge.has(edge)) throw new Error('Ambiguous managed roof plane edge');
     byEdge.set(edge, id);
   }
   const { length, area: areaScale, volume: volumeScale, angle: angleScale } = roofMeasureScales(anchor);
@@ -136,7 +136,7 @@ export function writeRoofPlaneParts(editor: StoreEditor, anchor: MeasureAnchor, 
     if (host !== null) voided.add(host);
   }
   let unknownNet = voided.has(roofId);
-  const planes = plan.planes.length ? plan.planes : [{ edge: -1, slope: 0, outline: plan.eaves }];
+  const planes = plan.planes.length ? plan.planes : [{ edge: -1, stage: 0, slope: 0, outline: plan.eaves }];
   if (body.solidIds.length !== planes.length) throw new Error('Every roof plane needs one Body item');
   const ids: number[] = [];
   let totalArea = 0;
@@ -147,11 +147,12 @@ export function writeRoofPlaneParts(editor: StoreEditor, anchor: MeasureAnchor, 
     if (index === 0) editor.setPositionalAttribute(shapeRepId, 3, [`#${body.solidIds[index]}`]);
     const productShapeId = index === 0 ? body.productShapeId : editor.addEntity('IfcProductDefinitionShape',
       [null, null, [`#${shapeRepId}`]]).expressId;
-    let id = byEdge.get(plane.edge);
+    const tag = roofPlaneTag(plane);
+    let id = byEdge.get(tag);
     if (id === undefined) {
       id = editor.addEntity('IfcSlab', [productGuid({}, anchor.guidRandom), owner,
-        `Roof plane ${plane.edge + 1}`, null, PART_TYPE,
-        `#${emitLocalPlacement(editor, placement, [0, 0, 0])}`, `#${productShapeId}`, String(plane.edge), '.ROOF.']).expressId;
+        `Roof plane ${plane.edge + 1}${plane.stage ? `.${plane.stage + 1}` : ''}`, null, PART_TYPE,
+        `#${emitLocalPlacement(editor, placement, [0, 0, 0])}`, `#${productShapeId}`, tag, '.ROOF.']).expressId;
     } else editor.setPositionalAttribute(id, 6, `#${productShapeId}`);
     ids.push(id);
     const area = nativeMeasures ? nativeMeasures[index].area * length ** 2 : Math.abs(signedArea(plane.outline)) * length ** 2 / Math.cos(plane.slope);

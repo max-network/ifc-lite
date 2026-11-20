@@ -200,8 +200,10 @@ export class StoreNamespace extends StoreStructuralNamespace {
    * is a roof by footprint: `EdgeSlopes[i]` (radians, 0 = gable end) slopes
    * the edge from point i to point i+1, the underside passes through every
    * sloped edge at `Position`'s height, and `Overhang` (metres) carries every
-   * edge out. Hip, gable, mono-pitch and L-shaped roofs; change one later with
-   * `editRoof`.
+   * edge out. `EdgeBreaks[i]` turns edge i to another slope at a height above
+   * the eaves: a gable end turning sloped is a half-hip, a steep slope turning
+   * shallower a mansard. Hip, gable, mono-pitch, pyramid, half-hip, mansard and
+   * L-shaped roofs; change one later with `editRoof`.
    */
   addRoof(modelId: string, storeyExpressId: number, params: AddRoofInStoreParams): EntityRef {
     return this.backend.store.addRoof(modelId, storeyExpressId, params);
