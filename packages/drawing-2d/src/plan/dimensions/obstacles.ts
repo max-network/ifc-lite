@@ -10,7 +10,7 @@ const OBSTACLE = /^Ifc(Stair|Ramp|Railing|Furnishing|Furniture|SystemFurniture|S
 /** Stairs, ramps, railings, furniture and fixtures: what interior chains keep clear of by default. */
 export const isPlanObstacle = (ifcType: string): boolean => OBSTACLE.test(ifcType) && !/type$/i.test(ifcType);
 
-/** The visible plan geometry of every obstacle element, in the local frame. */
+/** The drawn plan geometry of every obstacle element (visible and hidden lines, cut outlines), in the local frame. */
 export function obstacleSegments(
   drawing: Partial<Pick<Drawing2D, 'lines' | 'cutPolygons'>>,
   keep: (ifcType: string) => boolean,
@@ -18,7 +18,7 @@ export function obstacleSegments(
 ): LocalSegment[] {
   const segments: LocalSegment[] = [];
   for (const line of drawing.lines ?? []) {
-    if (line.visibility === 'visible' && keep(line.ifcType)) segments.push([toLocal(line.line.start), toLocal(line.line.end)]);
+    if (keep(line.ifcType)) segments.push([toLocal(line.line.start), toLocal(line.line.end)]);
   }
   for (const cut of drawing.cutPolygons ?? []) {
     if (!keep(cut.ifcType)) continue;
@@ -47,6 +47,11 @@ function crossesBox(segment: LocalSegment, x0: number, y0: number, x1: number, y
     if (t0 > t1) return false;
   }
   return true;
+}
+
+/** Whether no obstacle segment enters the box. */
+export function boxClear(obstacles: readonly LocalSegment[], x0: number, y0: number, x1: number, y1: number): boolean {
+  return !obstacles.some((segment) => crossesBox(segment, x0, y0, x1, y1));
 }
 
 function touching(obstacles: readonly LocalSegment[], axis: ScanAxis, at: number, lo: number, hi: number, band: number): number {

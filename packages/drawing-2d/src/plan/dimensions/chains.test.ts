@@ -160,8 +160,8 @@ describe('buildPlanDimensions: interior chains', () => {
       return { across: across?.segments[0].a.y, beside: beside?.segments[0].a.x, spans: [lengths(across), lengths(beside)] };
     };
     const clear = levels({});
-    expect(clear.across).toBeCloseTo(4.6);
-    expect(clear.beside).toBeCloseTo(7.55);
+    expect(clear.across).toBeCloseTo(5.05);
+    expect(clear.beside).toBeCloseTo(8);
     expect(clear.spans).toEqual([[9.4], [7.4]]);
     const ignored = levels({ obstacle: () => false });
     expect(ignored.across).toBeCloseTo(3.4);
