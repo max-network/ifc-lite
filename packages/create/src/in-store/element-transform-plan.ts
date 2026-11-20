@@ -31,6 +31,9 @@ import {
   IDENTITY_FRAME, applyFrame, frameInStorey, objectPlacementOf, placementAncestors, placementOrigin, uprightFrame,
   type PlacementReader, type PlanFrame,
 } from './element-transform-frames.js';
+import { AnchorEntityReader } from './resolve-anchor.js';
+import { asRef, refList } from './style-entity-reader.js';
+import { SPATIAL_TYPES } from './copy-product.js';
 
 type Vec2 = [number, number];
 
@@ -84,16 +87,18 @@ const isOpening = (type: string) => IfcTypeEnumFromString(type) === IfcTypeEnum.
  */
 function movedSet(input: TransformPlanInput, gridCarried: ReadonlySet<number>): Map<number, number | null> {
   const moved = new Map<number, number | null>();
+  const parts = assemblyParts(input);
   for (const id of input.selected) moved.set(id, input.storeyOf(id));
   for (const id of input.selected) {
     // A bare opening moves on its own: expanding it would take its host along.
     const type = typeOf(input, id);
     if (isOpening(type)) continue;
-    const affected = expandAffectedSet(input.dataStore, input.view, [id], 'hostsChanged');
+    const group = [id, ...parts(id)];
+    const affected = expandAffectedSet(input.dataStore, input.view, group, 'hostsChanged');
     // A grid's placement closure also contains hosts. Expand those hosts in
     // one batch so independently placed openings/fillings become move roots.
     const bound = type === 'IFCGRID' ? [...affected].filter(dependent => gridCarried.has(dependent)) : [];
-    const dependents = bound.length ? expandAffectedSet(input.dataStore, input.view, [id, ...bound], 'hostsChanged') : affected;
+    const dependents = bound.length ? expandAffectedSet(input.dataStore, input.view, [...group, ...bound], 'hostsChanged') : affected;
     for (const dependent of dependents) {
       // The walk also returns what is not placed (a material relationship the
       // parser has no type name for): only placed products move.
@@ -101,6 +106,33 @@ function movedSet(input: TransformPlanInput, gridCarried: ReadonlySet<number>): 
     }
   }
   return moved;
+}
+
+/**
+ * The parts an element assembles at every depth (`IfcRelAggregates` from a
+ * non-spatial whole, overlay included): a stair moves with its flights and an
+ * element assembly with its members. A part placed relative to its whole is
+ * carried; one placed on the storey becomes a root of its own.
+ */
+function assemblyParts(input: Pick<TransformPlanInput, 'dataStore' | 'view'>): (id: number) => number[] {
+  const reader = new AnchorEntityReader(input.dataStore, input.view);
+  const partsOf = new Map<number, number[]>();
+  for (const relId of reader.ids('IFCRELAGGREGATES')) {
+    const rel = reader.entity(relId);
+    const whole = asRef(rel?.attributes[4]);
+    if (whole === null || SPATIAL_TYPES.has(typeOf(input, whole))) continue;
+    partsOf.set(whole, [...(partsOf.get(whole) ?? []), ...refList(rel?.attributes[5])]);
+  }
+  return (id) => {
+    const found = new Set<number>(), pending = [...(partsOf.get(id) ?? [])];
+    while (pending.length > 0) {
+      const part = pending.pop()!;
+      if (part === id || found.has(part)) continue;
+      found.add(part);
+      pending.push(...(partsOf.get(part) ?? []));
+    }
+    return [...found];
+  };
 }
 
 /** A product's `ObjectPlacement` when it is an `IfcLocalPlacement`, else null. */

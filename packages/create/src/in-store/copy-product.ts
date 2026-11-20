@@ -89,7 +89,8 @@ export interface CopyProductResult {
 
 /** Classes that are copied with their host, never on their own. */
 const HOSTED_TYPES = new Set(['IFCOPENINGELEMENT', 'IFCOPENINGSTANDARDCASE', 'IFCVOIDINGFEATURE']);
-const SPATIAL_TYPES = new Set(['IFCSPACE', 'IFCBUILDINGSTOREY', 'IFCBUILDING', 'IFCSITE', 'IFCSPATIALZONE', 'IFCEXTERNALSPATIALELEMENT', 'IFCPROJECT']);
+/** Spatial structure: what it aggregates is placed, copied and moved on its own. */
+export const SPATIAL_TYPES: ReadonlySet<string> = new Set(['IFCSPACE', 'IFCBUILDINGSTOREY', 'IFCBUILDING', 'IFCSITE', 'IFCSPATIALZONE', 'IFCEXTERNALSPATIALELEMENT', 'IFCPROJECT']);
 
 interface HostedLink { readonly id: number; readonly ownerHistory: string | null }
 
