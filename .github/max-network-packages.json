@@ -5,5 +5,14 @@
   "prerelease": "mn.1",
   "distTag": "latest",
   "repository": "https://github.com/max-network/ifc-lite",
-  "packages": ["create", "drawing-2d", "ids", "ifcx", "pointcloud", "sdk", "validate"]
+  "packages": [
+    "create",
+    "drawing-2d",
+    "geometry",
+    "ids",
+    "ifcx",
+    "pointcloud",
+    "sdk",
+    "validate"
+  ]
 }
