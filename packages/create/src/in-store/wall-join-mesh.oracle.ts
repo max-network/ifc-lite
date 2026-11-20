@@ -49,6 +49,11 @@ export function exportText(s: { store: IfcDataStore; view: MutablePropertyView; 
 }
 
 export function meshWalls(api: IfcAPI, text: string): Map<number, Mesh[]> {
+  return meshProducts(api, text, ['IfcWall']);
+}
+
+/** Every mesh of the products of `types`, by product, in absolute world coordinates (WebGL Y-up). */
+export function meshProducts(api: IfcAPI, text: string, types: readonly string[]): Map<number, Mesh[]> {
   const bytes = new TextEncoder().encode(text);
   const pre = api.buildPrePassOnce(bytes);
   const meshes = new Map<number, Mesh[]>();
@@ -62,7 +67,7 @@ export function meshWalls(api: IfcAPI, text: string): Map<number, Mesh[]> {
       for (let i = 0; i < collection.length; i++) {
         const m = collection.get(i);
         if (!m) continue;
-        if (m.ifcType === 'IfcWall') {
+        if (types.includes(m.ifcType)) {
           const list = meshes.get(m.expressId) ?? [];
           // Positions are relative to the mesh's own origin (WebGL Y-up); make them absolute.
           const [ox, oy, oz] = Array.from(m.origin);
