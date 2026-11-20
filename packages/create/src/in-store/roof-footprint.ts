@@ -31,9 +31,11 @@ import { emitExtrudedSolid, emitPolygonProfile } from './_emit-helpers.js';
 import { getModelLengthUnitScale } from './edit/length-unit-scale.js';
 import { refId } from './host-geometry-frame.js';
 import { AnchorEntityReader } from './resolve-anchor.js';
-import { heightAt, openFootprint, planFootprintRoof, roofPlaneTag, type FootprintRoofPlan, type RoofEdgeBreak, type RoofShapeType } from './roof-footprint-plan.js';
+import { heightAt, openFootprint, planFootprintRoof, roofPlaneTag, type FootprintRoofPlan, type PlanPoint, type RoofEdgeBreak, type RoofShapeType } from './roof-footprint-plan.js';
 
 export const ROOF_FOOTPRINT_PSET = 'IfcLite_RoofFootprint';
+/** Metres each wall cutter reaches past its plane, so neighbouring cutters overlap instead of sharing a face. */
+const CUTTER_OVERLAP = 1e-4;
 
 /** The footprint form of `addRoof`: either field present selects it. */
 export interface RoofFootprintFields {
@@ -66,6 +68,8 @@ export interface FootprintRoofDefinition {
 
 /** One edit of a roof by footprint. Unnamed fields keep their value. */
 export interface RoofFootprintEdit {
+  /** A new footprint, metres, placement-local; its edges keep their slopes and breaks by index, so their counts must match. */
+  readonly Footprint?: Array<[number, number]>;
   /** Every edge's slope at once, radians, one per footprint edge. */
   readonly EdgeSlopes?: number[];
   /** One edge's slope, radians; applied after `EdgeSlopes`. */
@@ -89,8 +93,24 @@ export interface FootprintRoofBody {
 type Vec3 = [number, number, number];
 const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
-/** Solids for each plane (or the flat slab), in the file's native length unit. */
-function emitPlaneSolids(editor: StoreEditor, plan: FootprintRoofPlan, thickness: number): { solidIds: number[]; profileIds: number[] } {
+/** `outline` (counter-clockwise) moved out by `by` along each edge's normal, its corners mitred. */
+function grownOutline(outline: readonly PlanPoint[], by: number): PlanPoint[] {
+  if (by === 0) return [...outline];
+  const n = outline.length;
+  const normal = (i: number): PlanPoint => {
+    const a = outline[i], b = outline[(i + 1) % n], length = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    return [(b[1] - a[1]) / length, (a[0] - b[0]) / length];
+  };
+  return outline.map((p, i) => {
+    const before = normal((i + n - 1) % n), after = normal(i);
+    const mitre = 1 + before[0] * after[0] + before[1] * after[1];
+    const scale = mitre < 1e-6 ? 0 : by / mitre;
+    return [p[0] + (before[0] + after[0]) * scale, p[1] + (before[1] + after[1]) * scale];
+  });
+}
+
+/** Solids for each plane (or the flat slab), in the file's native length unit; `grow` widens each plane's outline. */
+function emitPlaneSolids(editor: StoreEditor, plan: FootprintRoofPlan, thickness: number, grow = 0): { solidIds: number[]; profileIds: number[] } {
   const solidIds: number[] = [], profileIds: number[] = [];
   if (plan.planes.length === 0) {
     const profileId = emitPolygonProfile(editor, plan.eaves);
@@ -102,7 +122,7 @@ function emitPlaneSolids(editor: StoreEditor, plan: FootprintRoofPlan, thickness
     const [dx, dy] = plane.direction, sin = Math.sin(plane.slope), cos = Math.cos(plane.slope);
     // X along the pivot line, Y up the slope, Z the plane's upward normal.
     const x: Vec3 = [dx, dy, 0], y: Vec3 = [-dy * cos, dx * cos, sin], z: Vec3 = [dy * sin, -dx * sin, cos];
-    const local = plane.outline.map((p): [number, number] => {
+    const local = grownOutline(plane.outline, grow).map((p): [number, number] => {
       const q: Vec3 = [p[0] - plane.origin[0], p[1] - plane.origin[1], heightAt(plane, p)];
       return [dot(q, x), dot(q, y)];
     });
@@ -139,7 +159,7 @@ export function emitFootprintRoofBody(
   const thickness = toNativeLength(anchor, definition.Thickness);
   // Wall cutters need only the unchanged underside and an intentionally tall cap.
   const mitres = options?.undersideCutters ? null : planRoofMitres(plan, thickness);
-  const { solidIds, profileIds } = mitres ? emitMitredPlanes(editor, plan, thickness, mitres) : emitPlaneSolids(editor, plan, thickness);
+  const { solidIds, profileIds } = mitres ? emitMitredPlanes(editor, plan, thickness, mitres) : emitPlaneSolids(editor, plan, thickness, options?.undersideCutters ? toNativeLength(anchor, CUTTER_OVERLAP) : 0);
   const shapeRepId = editor.addEntity('IfcShapeRepresentation', [
     `#${bodyContextId}`, 'Body', mitres ? 'CSG' : 'SweptSolid', solidIds.map((id) => `#${id}`),
   ]).expressId;
@@ -253,7 +273,10 @@ function removeReplacedPlanes(store: IfcDataStore, draft: StoreEditor, itemIds: 
 function assertRoofEdit(patch: RoofFootprintEdit): void {
   if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw new Error('A roof edit must be an object');
   for (const name of Object.keys(patch)) {
-    if (!['EdgeSlopes', 'Edge', 'EdgeBreaks', 'Overhang', 'Thickness'].includes(name)) throw new Error(`Unsupported roof edit field ${name}`);
+    if (!['Footprint', 'EdgeSlopes', 'Edge', 'EdgeBreaks', 'Overhang', 'Thickness'].includes(name)) throw new Error(`Unsupported roof edit field ${name}`);
+  }
+  if (patch.Footprint !== undefined && (!Array.isArray(patch.Footprint) || patch.Footprint.some((p) => !Array.isArray(p) || p.length !== 2 || !p.every(Number.isFinite)))) {
+    throw new Error('Footprint must be an array of [x, y] points in metres');
   }
   if (patch.EdgeSlopes !== undefined && !Array.isArray(patch.EdgeSlopes)) throw new Error('EdgeSlopes must be an array of radians, one per footprint edge');
   if (patch.EdgeBreaks !== undefined && !Array.isArray(patch.EdgeBreaks)) throw new Error('EdgeBreaks must be an array with one list of breaks per footprint edge');
@@ -323,7 +346,7 @@ function parseBreaks(value: unknown): RoofEdgeBreak[][] | null {
 }
 
 /**
- * Change a roof by footprint (one edge's slope, all slopes, the overhang or the
+ * Change a roof by footprint (its footprint, one edge's slope, all slopes, the overhang or the
  * thickness) and rebuild its planes, as one atomic edit: a refusal writes nothing.
  * Identity, placement, containment and properties are kept; the body is replaced.
  */
@@ -342,8 +365,12 @@ export function editFootprintRoofInStore(store: IfcDataStore, editor: StoreEdito
       slopes[Index] = patch.Edge.Slope;
     }
     const breaks = patch.EdgeBreaks ?? current.EdgeBreaks;
+    const footprint = patch.Footprint === undefined ? current.Footprint : openFootprint(patch.Footprint);
+    if (slopes.length !== footprint.length || (breaks !== undefined && breaks.length !== footprint.length)) {
+      throw new Error(`EdgeSlopes and EdgeBreaks need one per footprint edge: the footprint has ${footprint.length}`);
+    }
     const next = {
-      Footprint: current.Footprint, EdgeSlopes: slopes, ...(breaks ? { EdgeBreaks: breaks } : {}),
+      Footprint: footprint, EdgeSlopes: slopes, ...(breaks ? { EdgeBreaks: breaks } : {}),
       Overhang: patch.Overhang ?? current.Overhang, Thickness: patch.Thickness ?? current.Thickness,
     };
 

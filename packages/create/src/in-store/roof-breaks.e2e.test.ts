@@ -55,6 +55,20 @@ describe('a roof with edge breaks in a loaded model', () => {
     expect(getFootprintRoofPlaneParts(s.store, s.view, roofId)).toHaveLength(2);
   });
 
+  it('an edit replaces the footprint and keeps the planes, and refuses one whose edges the slopes do not match', async () => {
+    const s = await newStorey();
+    const { roofId } = addRoofToStore(s.editor, s.anchor, HALF_HIP);
+    const parts = getFootprintRoofPlaneParts(s.store, s.view, roofId);
+    const footprint: Array<[number, number]> = [[0, 0], [12, 0], [12, 6], [0, 6]];
+    const definition = editFootprintRoofInStore(s.store, s.editor, roofId, { Footprint: footprint });
+    expect(definition.Footprint).toEqual(footprint);
+    expect(definition.EdgeBreaks).toEqual(HALF_HIP.EdgeBreaks);
+    expect(readFootprintRoofInStore(s.store, roofId, s.view)?.Footprint).toEqual(footprint);
+    expect(getFootprintRoofPlaneParts(s.store, s.view, roofId).sort()).toEqual([...parts].sort());
+    expect(() => editFootprintRoofInStore(s.store, s.editor, roofId, { Footprint: [[0, 0], [12, 0], [6, 6]] })).toThrow(/one per footprint edge/);
+    expect(readFootprintRoofInStore(s.store, roofId, s.view)?.Footprint).toEqual(footprint);
+  });
+
   it('a rotated slab opening turns its rectangle about the host\'s Z', async () => {
     const s = await newStorey();
     const { roofId } = addRoofToStore(s.editor, s.anchor, { ...HALF_HIP, EdgeBreaks: undefined, EdgeSlopes: [30 * D, 30 * D, 30 * D, 30 * D] });
