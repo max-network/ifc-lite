@@ -1,0 +1,21 @@
+name: max-network CI
+
+on:
+  pull_request:
+    branches: [max-network/main]
+
+concurrency:
+  group: max-network-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: github.repository == 'max-network/ifc-lite'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: ./.github/actions/max-network-verify

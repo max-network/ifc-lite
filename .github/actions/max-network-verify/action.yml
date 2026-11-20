@@ -1,0 +1,64 @@
+name: Verify max-network packages
+description: Install, build every package, then typecheck and test the configured max-network packages.
+
+inputs:
+  packages:
+    description: "Comma-separated directories under packages/ (empty: every configured package)"
+    required: false
+    default: ""
+
+outputs:
+  list:
+    description: The verified package directories, comma-separated
+    value: ${{ steps.select.outputs.list }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: 22
+
+    - name: Enable pnpm
+      shell: bash
+      run: corepack enable
+
+    - name: Install
+      shell: bash
+      run: pnpm install --frozen-lockfile
+
+    - name: Fetch the prebuilt wasm
+      shell: bash
+      run: pnpm build:wasm:fetch
+
+    - name: Select packages
+      id: select
+      shell: bash
+      env:
+        REQUESTED: ${{ inputs.packages }}
+      run: |
+        set -euo pipefail
+        LIST=$(node -e "
+          const all = require('./.github/max-network-packages.json').packages;
+          const asked = (process.env.REQUESTED || '').split(',').map(s => s.trim()).filter(Boolean);
+          const bad = asked.filter(p => !all.includes(p));
+          if (bad.length) { console.error('Not configured: ' + bad.join(', ')); process.exit(1); }
+          console.log((asked.length ? asked : all).join(','));
+        ")
+        FILTERS=$(node -e "console.log(process.argv[1].split(',').map(d => '--filter=' + require('./packages/' + d + '/package.json').name).join(' '))" "$LIST")
+        echo "list=$LIST" >> "$GITHUB_OUTPUT"
+        echo "filters=$FILTERS" >> "$GITHUB_OUTPUT"
+
+    # Typecheck reads sibling sources through path maps, so every package is built first.
+    - name: Build every package
+      shell: bash
+      run: pnpm turbo build --filter='./packages/*'
+
+    - name: Typecheck the selected packages
+      shell: bash
+      run: pnpm turbo typecheck ${{ steps.select.outputs.filters }}
+
+    # One package at a time: worker-backed suites miss their time budgets side by side on hosted runners.
+    - name: Test the selected packages
+      shell: bash
+      run: pnpm turbo test --concurrency=1 ${{ steps.select.outputs.filters }}
