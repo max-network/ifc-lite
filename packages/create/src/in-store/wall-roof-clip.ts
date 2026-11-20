@@ -3,15 +3,18 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { PropertyValueType } from '@ifc-lite/data';
 import { effectiveReferencers } from '@ifc-lite/export';
+import { MutablePropertyView } from '@ifc-lite/mutations';
+import { extractPropertiesOnDemand, type IfcDataStore } from '@ifc-lite/parser';
 import type { EditTarget } from './edit/target.js';
 import { getModelLengthUnitScale } from './edit/length-unit-scale.js';
-import { wallBaseSolid, ROOF_ATTACHMENT } from './edit/wall-base-solid.js';
+import { isRoofClipped, wallBaseSolid, ROOF_ATTACHMENT } from './edit/wall-base-solid.js';
 import { AnchorEntityReader } from './resolve-anchor.js';
 import { axis2d, axis3d, applyFrame, composeFrame, inverseFrame, placementInAncestor, pointOf, refId, type Vec3 } from './host-geometry-frame.js';
 import { readFootprintRoofInStore, planFootprintRoofNative, emitFootprintRoofBody } from './roof-footprint.js';
-import { heightAt, type PlanPoint } from './roof-footprint-plan.js';
+import { heightAt, type FootprintRoofPlan, type PlanPoint } from './roof-footprint-plan.js';
 
-function frame(target: EditTarget, id: number) {
+type ReadTarget = Pick<EditTarget, 'dataStore' | 'view'>;
+function frame(target: ReadTarget, id: number) {
   const reader = new AnchorEntityReader(target.dataStore, target.view);
   const placement = refId(reader.entity(id)?.attributes[5]);
   const result = placement === null ? null : placementInAncestor(reader, placement, null);
@@ -57,7 +60,7 @@ function covered(boundary: readonly Vec3[], eaves: readonly PlanPoint[]): boolea
   }
   return true;
 }
-function body(target: EditTarget, wallId: number) {
+function body(target: ReadTarget, wallId: number) {
   const reader = new AnchorEntityReader(target.dataStore, target.view);
   const shape = reader.entity(refId(reader.entity(wallId)?.attributes[6]) ?? -1);
   const reps = Array.isArray(shape?.attributes[2]) ? shape.attributes[2] : [];
@@ -65,12 +68,12 @@ function body(target: EditTarget, wallId: number) {
   const rep = repId === undefined ? null : reader.entity(repId);
   const items = rep?.attributes[3];
   const root = Array.isArray(items) && items.length === 1 ? refId(items[0]) : null;
-  const base = wallBaseSolid(reader, target.view, wallId, root);
+  const base = wallBaseSolid(reader, isRoofClipped(target.dataStore, target.view, wallId), root);
   const solid = base === null ? null : reader.entity(base);
   if (repId === undefined || root === null || base === null || solid?.type.toUpperCase() !== 'IFCEXTRUDEDAREASOLID') throw new Error(`Wall #${wallId} needs a single extruded body to attach to a roof`);
   return { reader, repId, root, base, solid };
 }
-function boundary(target: EditTarget, solid: { attributes: readonly unknown[] }): Vec3[] {
+function boundary(target: ReadTarget, solid: { attributes: readonly unknown[] }): Vec3[] {
   const reader = new AnchorEntityReader(target.dataStore, target.view);
   const profile = reader.entity(refId(solid.attributes[0]) ?? -1);
   let points: PlanPoint[];
@@ -97,6 +100,64 @@ function removeCuts(target: EditTarget, root: number, base: number): void {
   for (let changed = true; changed;) { changed = false; for (const id of found) if (incoming(id).some(parent => !found.has(parent))) { found.delete(id); changed = true; } }
   for (const id of found) target.editor.removeEntity(id);
 }
+function undersideAt(plan: FootprintRoofPlan, p: readonly number[]): number {
+  const face = plan.planes.find(face => contains(face.outline, p));
+  return face ? heightAt(face, [p[0], p[1]]) : 0;
+}
+/** Where the segment a-b crosses an edge of a roof plane outline, as fractions of a-b. */
+function crossings(plan: FootprintRoofPlan, a: Vec3, b: Vec3): number[] {
+  const ts: number[] = [];
+  const dx = b[0] - a[0], dy = b[1] - a[1];
+  for (const { outline } of plan.planes) for (let j = 0; j < outline.length; j++) {
+    const p = outline[j], q = outline[(j + 1) % outline.length], ex = q[0] - p[0], ey = q[1] - p[1];
+    const det = dx * ey - dy * ex;
+    if (Math.abs(det) < 1e-12) continue;
+    const t = ((p[0] - a[0]) * ey - (p[1] - a[1]) * ex) / det;
+    const u = ((p[0] - a[0]) * dy - (p[1] - a[1]) * dx) / det;
+    if (t > 0 && t < 1 && u >= 0 && u <= 1) ts.push(t);
+  }
+  return ts;
+}
+function sourceView(store: IfcDataStore): MutablePropertyView {
+  const view = new MutablePropertyView(store.properties ?? null, '__roof-top__');
+  view.setOnDemandExtractor((id: number) => extractPropertiesOnDemand(store, id));
+  return view;
+}
+/** One point of a wall's top along its own x axis: `at` from the wall placement, `height` above the body's base, metres. */
+export interface WallTopPoint {
+  at: number;
+  height: number;
+}
+/**
+ * The top of a wall `clipWallToRoof` cut to `roofId`, along the wall's own x axis from one end of its body to the
+ * other: the roof underside over the lower of its two faces, capped by the extrusion. Between two points the top is
+ * straight. Null when the wall carries no cut of ours or the roof is not one by footprint. Without a view it reads
+ * the file as saved.
+ */
+export function readRoofClippedWallTop(store: IfcDataStore, view: MutablePropertyView | null | undefined, wallId: number, roofId: number): WallTopPoint[] | null {
+  const target = { dataStore: store, view: view ?? sourceView(store) };
+  if (!isRoofClipped(store, target.view, wallId)) return null;
+  const definition = readFootprintRoofInStore(store, roofId, target.view);
+  if (!definition) return null;
+  const scale = getModelLengthUnitScale(store);
+  const plan = planFootprintRoofNative({ lengthUnitScale: scale }, definition);
+  const wallToRoof = composeFrame(inverseFrame(frame(target, roofId)), frame(target, wallId));
+  const { solid } = body(target, wallId);
+  const corners = boundary(target, solid);
+  const depth = Number(solid.attributes[3]);
+  const base = Math.min(...corners.map(p => p[2]));
+  const xs = corners.map(p => p[0]), ys = corners.map(p => p[1]);
+  const [x0, x1] = [Math.min(...xs), Math.max(...xs)];
+  const faces = [Math.min(...ys), Math.max(...ys)].map(y => [applyFrame(wallToRoof, [x0, y, base]), applyFrame(wallToRoof, [x1, y, base])]);
+  const ts = [...new Set([0, 1, ...faces.flatMap(([a, b]) => crossings(plan, a, b))].map(t => Math.round(t * 1e12) / 1e12))].sort((a, b) => a - b);
+  return ts.map(t => {
+    const lowest = Math.min(...faces.map(([a, b]) => {
+      const p: Vec3 = [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1]), a[2] + t * (b[2] - a[2])];
+      return undersideAt(plan, p) - p[2];
+    }));
+    return { at: (x0 + t * (x1 - x0)) * scale, height: Math.min(lowest, Number.isFinite(depth) ? depth : lowest) * scale };
+  });
+}
 /** Caller owns an atomic edit. The cutters start exactly on the shared roof underside. */
 export function clipWallToRoof(target: EditTarget, wallId: number, roofId: number): void {
   const definition = readFootprintRoofInStore(target.dataStore, roofId, target.view);
@@ -110,9 +171,7 @@ export function clipWallToRoof(target: EditTarget, wallId: number, roofId: numbe
   const corners = boundary(target, own.solid).map(p => applyFrame(wallToRoof, p));
   if (!covered(corners, plan.eaves)) throw new Error(`The roof #${roofId} does not cover the whole wall #${wallId}`);
   for (const p of corners) {
-    const face = plan.planes.find(face => contains(face.outline, p));
-    const height = face ? heightAt(face, [p[0], p[1]]) : 0;
-    if (height - p[2] < .01 / scale) throw new Error(`The roof #${roofId} is below the wall's base`);
+    if (undersideAt(plan, p) - p[2] < .01 / scale) throw new Error(`The roof #${roofId} is below the wall's base`);
   }
   const signature = JSON.stringify([roofFrame, wallFrame, definition, corners, own.solid.attributes[3]]);
   if (target.view.getPropertyValue(wallId, ROOF_ATTACHMENT, 'Clipped') === true && target.view.getPropertyValue(wallId, ROOF_ATTACHMENT, 'Signature') === signature) return;

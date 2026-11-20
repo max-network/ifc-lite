@@ -131,6 +131,7 @@ export {
   planFootprintRoof, heightAt as roofPlaneHeightAt, roofPlaneTag,
   type FootprintRoofPlan, type RoofEdgeBreak, type RoofPlane, type RoofShapeType,
 } from './roof-footprint-plan.js';
+export { readRoofClippedWallTop, type WallTopPoint } from './wall-roof-clip.js';
 export { addPlateToStore, type PlateInStoreParams, type PlateRectangleParams, type PlatePolygonParams, type PlateBuildResult } from './plate.js';
 export { addMemberToStore, type MemberInStoreParams, type ProfiledMemberInStoreParams, type MemberBuildResult } from './member.js';
 export {

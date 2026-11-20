@@ -14,7 +14,7 @@
  * Generic placement reads / writes live in `placement-core.ts`.
  */
 
-import { wallBaseSolid, ROOF_ATTACHMENT } from './wall-base-solid.js';
+import { isRoofClipped, wallBaseSolid, ROOF_ATTACHMENT } from './wall-base-solid.js';
 import { AnchorEntityReader } from '../resolve-anchor.js';
 import type { IfcDataStore } from '@ifc-lite/parser';
 import type { MutablePropertyView, StoreEditor } from '@ifc-lite/mutations';
@@ -123,7 +123,7 @@ export function resolveWallEditChain(
   // IfcShapeRepresentation.Items is index 3.
   const items = shapeRepAttrs[3];
   if (!Array.isArray(items) || items.length === 0) return null;
-  const solidId = wallBaseSolid(new AnchorEntityReader(dataStore, view), view, expressId, asExpressIdRef(items[0]));
+  const solidId = wallBaseSolid(new AnchorEntityReader(dataStore, view), isRoofClipped(dataStore, view, expressId), asExpressIdRef(items[0]));
   if (solidId === null) return null;
 
   const solidAttrs = readAttributes(dataStore, view, editor, solidId);

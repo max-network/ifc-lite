@@ -15,7 +15,7 @@
  * neither be re-shaped nor joined.
  */
 
-import { wallBaseSolid } from './edit/wall-base-solid.js';
+import { isRoofClipped, wallBaseSolid } from './edit/wall-base-solid.js';
 import { createSchemaEntityNameSnapshot, getSchemaRegistryForVersion, type IfcDataStore } from '@ifc-lite/parser';
 import type { MutablePropertyView } from '@ifc-lite/mutations';
 import { AnchorEntityReader } from './resolve-anchor.js';
@@ -232,7 +232,7 @@ function readWallJoinRecord(
   if (!base) return null;
   const { reader, placement, axisPlacementId, locationPointId, refDirectionId, location, dir, productShapeId, ids, bodyRepId, axisRepId } = base;
   const bodyItems = reader.entity(bodyRepId)?.attributes[3];
-  const solidId = wallBaseSolid(reader, view, wallId, Array.isArray(bodyItems) && bodyItems.length > 0 ? refId(bodyItems[0]) : null);
+  const solidId = wallBaseSolid(reader, isRoofClipped(store, view, wallId), Array.isArray(bodyItems) && bodyItems.length > 0 ? refId(bodyItems[0]) : null);
   const solid = solidId === null ? null : reader.entity(solidId);
   if (solidId === null || solid?.type.toUpperCase() !== 'IFCEXTRUDEDAREASOLID') return null;
   const profileId = refId(solid.attributes[0]);
