@@ -79,6 +79,13 @@ describe('roof edge breaks', () => {
     expectTiledAndWatertight(plan);
   });
 
+  it('two opposed slopes between gable ends are a gable roof on any outline, as a gable dormer roof', () => {
+    const dormer: PlanPoint[] = [[0, 0], [2, 0], [2, 1.5], [1, 2.3], [0, 1.5]];
+    const plan = planFootprintRoof(dormer, [0, 40 * D, 0, 0, 40 * D], 0);
+    expect(plan.shapeType).toBe('GABLE_ROOF');
+    expect(planFootprintRoof(RECT, [30 * D, 30 * D, 0, 0], 0).shapeType).toBe('FREEFORM');
+  });
+
   it('a fall of 5° or less is a flat roof', () => {
     expect(planFootprintRoof(RECT, [3 * D, 0, 0, 0], 0).shapeType).toBe('FLAT_ROOF');
     expect(planFootprintRoof(RECT, [8 * D, 0, 0, 0], 0).shapeType).toBe('SHED_ROOF');

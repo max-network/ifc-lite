@@ -77,8 +77,14 @@ export function heightAt(plane: Pick<RoofPlane, 'origin' | 'direction' | 'slope'
   return Math.tan(plane.slope) * inward;
 }
 
-/** The predefined type a footprint's slopes and breaks describe; `apex` when every plane meets at one top point. */
-export function roofShapeType(slopes: readonly number[], breaks: ReadonlyArray<readonly RoofEdgeBreak[]> = [], apex = false): RoofShapeType {
+/**
+ * The predefined type a footprint's slopes and breaks describe; `apex` when every
+ * plane meets at one top point. With the edges' `directions`, any two opposed
+ * sloped edges between gable ends are a gable roof, whatever the outline's count.
+ */
+export function roofShapeType(
+  slopes: readonly number[], breaks: ReadonlyArray<readonly RoofEdgeBreak[]> = [], apex = false, directions?: readonly PlanPoint[],
+): RoofShapeType {
   const sloped = slopes.map((a) => a > NO_SLOPE);
   const count = sloped.filter(Boolean).length;
   const turns = slopes.map((_, i) => breaks[i] ?? []);
@@ -88,7 +94,9 @@ export function roofShapeType(slopes: readonly number[], breaks: ReadonlyArray<r
   if (turns.some((t, i) => sloped[i] && t.some((b) => b.Slope > NO_SLOPE))) return count === slopes.length ? 'MANSARD_ROOF' : 'GAMBREL_ROOF';
   if (count === slopes.length) return apex ? 'PAVILION_ROOF' : 'HIP_ROOF';
   if (count === 1) return 'SHED_ROOF';
-  // A named gable has two opposing pitches separated by two gable ends.
+  const pair = slopes.flatMap((_, i) => (sloped[i] ? [directions?.[i]] : []));
+  const [a, b] = pair;
+  if (count === 2 && a && b) return a[0] * b[0] + a[1] * b[1] < -1 + 1e-9 ? 'GABLE_ROOF' : 'FREEFORM';
   return slopes.length === 4 && count === 2 && sloped[0] === sloped[2] && sloped[1] === sloped[3]
     ? 'GABLE_ROOF' : 'FREEFORM';
 }
@@ -298,7 +306,7 @@ export function planFootprintRoof(
   if (Math.abs(tiled - expected) > 1e-7 * Math.abs(expected)) {
     throw new Error('The roof planes do not cover the eaves; this footprint is not supported');
   }
-  return { shapeType: roofShapeType(s, turns, oneApex(planes, rise)), planes, eaves, rise };
+  return { shapeType: roofShapeType(s, turns, oneApex(planes, rise), dirs), planes, eaves, rise };
 }
 
 /** Every plane reaches the roof's top at one and the same point: a pyramid. */
