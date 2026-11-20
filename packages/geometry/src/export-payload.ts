@@ -18,7 +18,7 @@ let engine: Promise<ExportPayload> | null = null;
 export function loadExportPayload(): Promise<ExportPayload> {
   engine ??= (async () => {
     const module = await import('@ifc-lite/wasm/rhino');
-    const bytes = await readNodeWasmBytes('@ifc-lite/wasm/rhino_bg.wasm');
+    const bytes = await readNodeWasmBytes('@ifc-lite/wasm/rhino_bg.wasm', import.meta.url);
     await initWasmWithRetry(async () => { await module.default(bytes ? { module_or_path: bytes } : undefined); }, { label: 'rhino-export' });
     return module;
   })();

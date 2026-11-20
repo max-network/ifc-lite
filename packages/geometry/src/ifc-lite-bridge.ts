@@ -155,7 +155,7 @@ export class IfcLiteBridge {
     try {
       // In the browser/worker, wasm-bindgen resolves and fetches the .wasm
       // itself; under Node the bytes are read from the installed package.
-      const wasmInitArg = await readNodeWasmBytes('@ifc-lite/wasm/ifc-lite_bg.wasm');
+      const wasmInitArg = await readNodeWasmBytes('@ifc-lite/wasm/ifc-lite_bg.wasm', import.meta.url);
       // Raw package resolution and Node's supplied bytes retain their paths; the
       // browser path joins the realm's one main-thread init (#7036), which a host
       // may already have started when the load was requested.

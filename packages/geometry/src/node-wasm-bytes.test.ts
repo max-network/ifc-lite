@@ -13,12 +13,19 @@ describe('readNodeWasmBytes', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it('reads an installed package file on Node', async () => {
-    const bytes = await readNodeWasmBytes('vitest/package.json');
+    const bytes = await readNodeWasmBytes('vitest/package.json', import.meta.url);
     expect(bytes).toBeInstanceOf(Uint8Array);
   });
 
   it('defers to wasm-bindgen where process.versions.node exists without Node built-ins', async () => {
     vi.stubGlobal('process', { versions: { node: '22.13.0' }, env: {} });
-    await expect(readNodeWasmBytes('vitest/package.json')).resolves.toBeUndefined();
+    await expect(readNodeWasmBytes('vitest/package.json', import.meta.url)).resolves.toBeUndefined();
+  });
+
+  it('defers to wasm-bindgen in a bundle that has Node built-ins but no file URL', async () => {
+    const real = process;
+    vi.stubGlobal('process', { versions: real.versions, env: {}, getBuiltinModule: real.getBuiltinModule.bind(real) });
+    await expect(readNodeWasmBytes('vitest/package.json', undefined)).resolves.toBeUndefined();
+    await expect(readNodeWasmBytes('vitest/package.json', 'worker.js')).resolves.toBeUndefined();
   });
 });
