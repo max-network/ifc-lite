@@ -119,8 +119,8 @@ export { currentFloorBands, storeyFloorsFromMeshes } from './storey-bands.js';
 export type { StoreyFloorMesh } from './storey-bands.js';
 export { isFeatureElementType } from './feature-elements.js';
 
-// Storey floor plans as construction sheets: element filter, storey-relative cut, symbols, poché
 export * from './plan/index.js';
+export * from './dimensions/index.js';
 export { parseDoorOperation, parseWindowPartitioning } from './openings/operation-types.js';
 
 // ═══════════════════════════════════════════════════════════════════════════

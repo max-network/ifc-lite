@@ -22,6 +22,8 @@ import {
   formatScaleFactorLabel,
   makeEntityKey, isPolygonCutLine,
   fitRasterPixels,
+  boundsWithDimensions,
+  dimensionsToSvg,
   type RasterFit,
   type Drawing2D,
   type DrawingSheet,
@@ -48,7 +50,7 @@ import { styleCutPolygons, type CutPolygonStyleContext } from '@/components/view
 import { drawCutPolygonsPdf, isPagePoint, prepareCutPolygonsPdf, type PdfCutPolygon } from '@/lib/export/section-pdf-cut-polygons';
 import { titleBlockWithEffectiveScale } from '@/hooks/titleBlockScaleField';
 import { scanOutlineDxfLayers, type ScanOutlineLayer } from '@/lib/scan-outline/scan-outline';
-import { boundsWithDimensions, dimensionsToSvg, drawDimensionsPdf } from '@/lib/export/dimension-export';
+import { drawDimensionsPdf } from '@/lib/export/dimension-export';
 import { noticeOtherCutDimensionsLeftOut, useExportDimensionGraphics } from '@/hooks/useExportDimensions';
 
 function tryDrawingSvg(generate: () => string | null): string | null {

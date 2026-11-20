@@ -5,11 +5,10 @@
 import '@/test/setup-dom.js';
 import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { dimensionGraphics } from '@/lib/drawing2d-markup/dimension-graphics';
 import { act } from 'react';
 import { cleanup, click, render, waitFor } from '@/test/render.js';
 import { loadDialogs } from '@/test/dialog-host.js';
-import type { DrawingSheet } from '@ifc-lite/drawing-2d';
+import { linearDimensionGraphics, type DrawingSheet } from '@ifc-lite/drawing-2d';
 import { DrawingExportMenu, type DrawingExportMenuProps } from './DrawingExportMenu.js';
 
 afterEach(() => cleanup());
@@ -146,7 +145,7 @@ describe('drawing export notices (#5850)', () => {
     render(<>
       <DrawingExportMenu {...props({
         markupCounts: { ...emptyCounts, measurements: 1 },
-        dimensionGraphicsAt: paperScale => [dimensionGraphics({ id: 'zero', a: { x: 2, y: 3 }, b: { x: 2, y: 3 },
+        dimensionGraphicsAt: paperScale => [linearDimensionGraphics({ a: { x: 2, y: 3 }, b: { x: 2, y: 3 },
           offset: 0, orientation: 'aligned' }, { paperScale, format: () => '0 m' })],
         onExportDxf: () => { exports++; },
       })} />
@@ -189,7 +188,7 @@ describe('drawing export notices (#5850)', () => {
       render(<>
         <DrawingExportMenu {...props({
           markupCounts: { ...emptyCounts, measurements: 1 },
-          dimensionGraphicsAt: paperScale => [dimensionGraphics({ id: 'zero', a: { x: 0, y: 0 }, b: { x: 0, y: 0 },
+          dimensionGraphicsAt: paperScale => [linearDimensionGraphics({ a: { x: 0, y: 0 }, b: { x: 0, y: 0 },
             offset: 0, orientation: 'aligned' }, { paperScale, format: () => '0 m' })],
           onExportSvg: () => { exports++; }, onPrint: () => { exports++; },
         })} />

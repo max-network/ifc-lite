@@ -5,7 +5,7 @@
 /**
  * Linear dimensions on the 2D drawing canvas, in screen space.
  *
- * Geometry comes from the shared `dimensionGraphics` (the exports and the IFC
+ * Geometry comes from the shared `linearDimensionGraphics` (the exports and the IFC
  * embed draw from the same function), mapped to pixels through the same
  * transform as the drawing (`drawingViewMapping`). The one screen-only change
  * is a legibility floor: text is drawn at least 11 px tall, and when that
@@ -18,8 +18,8 @@
  * the cursor are drawn here too.
  */
 
+import { linearDimensionGraphics, DIMENSION_PAPER_MM } from '@ifc-lite/drawing-2d';
 import type { SnapMode } from '@/lib/drafting-core/types';
-import { dimensionGraphics, DIMENSION_PAPER_MM } from '@/lib/drawing2d-markup/dimension-graphics';
 import type { DrawingViewMapping } from '@/lib/drawing2d-markup/drawing-view-mapping';
 import { isDimensionOnPlane, type Dimension2D } from '@/store/slices/drawing2DDimensions';
 import type { DrawnSectionPlane, Point2D } from '@/store/slices/drawing2DSlice';
@@ -43,7 +43,7 @@ export interface DimensionScreenLayout {
 }
 
 export function dimensionScreenLayout(dim: Dimension2D, c: DimensionLayoutContext): DimensionScreenLayout {
-  const g = dimensionGraphics(dim, { paperScale: c.paperScale, format: c.format, flip: c.mapping.flip });
+  const g = linearDimensionGraphics(dim, { paperScale: c.paperScale, format: c.format, flip: c.mapping.flip });
   const map = (s: Seg): Seg => [c.mapping.toScreen(s[0]), c.mapping.toScreen(s[1])];
   const lines = g.lines.map(map);
   const truePx = g.text.heightM * c.mapping.pxPerMetre;

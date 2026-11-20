@@ -4,7 +4,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { dimensionGraphics } from '@/lib/drawing2d-markup/dimension-graphics';
+import { linearDimensionGraphics } from '@ifc-lite/drawing-2d';
 import type { DrawingExportContent, DrawingExportFormat } from './drawing-export-omissions';
 
 async function omissions(content: DrawingExportContent, format: DrawingExportFormat) {
@@ -21,8 +21,8 @@ const empty: DrawingExportContent = {
   sheetScale: null,
 };
 
-const graphic = (length = 5, paperScale = 100) => dimensionGraphics({
-  id: 'test', a: { x: 0, y: 0 }, b: { x: length, y: 0 }, offset: 0, orientation: 'aligned',
+const graphic = (length = 5, paperScale = 100) => linearDimensionGraphics({
+  a: { x: 0, y: 0 }, b: { x: length, y: 0 }, offset: 0, orientation: 'aligned',
 }, { paperScale, format: m => `${m} m` });
 
 describe('drawing export omissions (#5850)', () => {

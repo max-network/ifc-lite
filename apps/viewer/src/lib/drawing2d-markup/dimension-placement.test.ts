@@ -4,7 +4,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { dimensionGraphics } from './dimension-graphics';
+import { linearDimensionGraphics } from '@ifc-lite/drawing-2d';
 import { placementOffset, placementOrientation, previewDimension } from './dimension-placement';
 import { drawingViewMapping } from './drawing-view-mapping';
 
@@ -29,13 +29,13 @@ describe('dimension placement', () => {
     assert.equal(placementOrientation({ x: 0, y: 2 }, { x: 5, y: 2 }, { x: 9, y: 2 }, true), 'horizontal');
   });
 
-  it('puts the dimension line through the cursor (offset sign matches dimensionGraphics)', () => {
+  it('puts the dimension line through the cursor (offset sign matches linearDimensionGraphics)', () => {
     const a = { x: 0, y: 0 }, b = { x: 4, y: 0 };
     for (const cursor of [{ x: 2, y: 1.5 }, { x: 2, y: -0.75 }, { x: -3, y: 2 }]) {
       for (const orientation of ['aligned', 'horizontal', 'vertical'] as const) {
         const bb = orientation === 'vertical' ? { x: 0, y: 4 } : b;
         const offset = placementOffset(a, bb, orientation, cursor);
-        const g = dimensionGraphics({ id: 'd', a, b: bb, offset, orientation }, { paperScale: 100, format: String });
+        const g = linearDimensionGraphics({ a, b: bb, offset, orientation }, { paperScale: 100, format: String });
         const [p, q] = g.lines[0];
         // The cursor lies on the infinite dimension line: cross product ~ 0.
         const cross = (q.x - p.x) * (cursor.y - p.y) - (q.y - p.y) * (cursor.x - p.x);

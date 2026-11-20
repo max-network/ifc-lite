@@ -11,7 +11,7 @@
  * places the drawing on paper (`resolveSheetTransform`: flip, then metres to
  * millimetres), and the view transform scales paper millimetres to pixels.
  * Either way the flips are `axisFlipForSection(axis)`, so the same flip
- * feeds `dimensionGraphics` and the text it lays out reads upright on screen.
+ * feeds `linearDimensionGraphics` and the text it lays out reads upright on screen.
  */
 
 import { axisFlipForSection, type SectionAxis } from '@/hooks/pdfSectionLayout';

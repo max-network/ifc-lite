@@ -24,6 +24,7 @@ import { generateFloorPlan, exportToSVG } from '../src/index.js';
 import { loadPlanFixture, wasmAvailable, type PlanFixture } from './plan-parity/fixture.js';
 import { measurePlan, type PlanMetrics } from './plan-parity/metrics.js';
 import { writeReport } from './plan-parity/report.js';
+import { measureDimensions, type DimensionMetrics } from './plan-parity/dimension-metrics.js';
 
 const CUT_HEIGHT = 1.2;
 const repo = (path: string) => fileURLToPath(new URL(`../../../${path}`, import.meta.url));
@@ -36,6 +37,7 @@ const FIXTURES: Array<{ name: string; path: string; required: boolean }> = [
 if (!wasmAvailable) console.warn('Plan parity skipped: the wasm runtime is not built (scripts/build-wasm.sh or pnpm build:wasm:fetch).');
 
 const rows: PlanMetrics[] = [];
+const dimensionRows: (DimensionMetrics & { fixture: string; storey: string })[] = [];
 const svgs = new Map<string, string>();
 const fixtures: PlanFixture[] = [];
 
@@ -64,8 +66,10 @@ async function measureFixture(fixture: PlanFixture): Promise<void> {
       openings: fixture.openings,
       storeyElements: storey.elements,
       spaces: { labels: fixture.spaceLabels },
+      dimensions: {},
       generator: { useGPU: false },
     });
+    dimensionRows.push({ fixture: fixture.name, storey: storey.name, ...measureDimensions(plan, storey.elements) });
     const planSvg = exportToSVG(plan, { materialCategories });
     rows.push(measurePlan(fixture, storey, 'generateStoreyPlan', plan, planSvg, offsetY, CUT_HEIGHT));
     svgs.set(`${slug}-generateStoreyPlan`, planSvg);
@@ -134,5 +138,21 @@ describe.skipIf(!wasmAvailable)('floor plan parity on real models', () => {
     for (const row of sheetRows()) expect(row.cutWallsHatched, `${row.fixture}/${row.storey}`).toBe(row.wallsCut);
     const fzk = sheetRows().filter((r) => r.fixture === 'AC20-FZK-Haus');
     for (const row of fzk) expect(row.wallsMaterialHatched, row.storey).toBe(row.wallsCut);
+  });
+
+  it('goal 6: dimensions every facade, chains each exterior jamb and crosses every room both ways', () => {
+    if (process.env.PLAN_PARITY_OUT) console.table(dimensionRows);
+    expect(dimensionRows.length).toBe(sheetRows().length);
+    for (const row of dimensionRows) {
+      const where = `${row.fixture}/${row.storey}`;
+      const walls = sheetRows().find((r) => r.fixture === row.fixture && r.storey === row.storey)?.wallsCut ?? 0;
+      expect(row.sidesDimensioned, where).toBe(walls > 0 ? 4 : 0);
+      expect(row.chainsClosing, where).toBe(row.openingChains);
+      expect(row.undimensionedOpenings, where).toEqual([]);
+      expect(row.spacesCrossedBothWays, where).toBe(row.spacesLabelled);
+    }
+    const ground = dimensionRows.find((r) => r.fixture === 'AC20-FZK-Haus' && r.storey === 'Erdgeschoss');
+    expect(ground?.exteriorOpenings).toBe(10);
+    expect(ground?.spacesLabelled).toBe(6);
   });
 });

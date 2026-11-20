@@ -13,17 +13,10 @@
  * a horizontal dimension) falls back to the other axis.
  */
 
+import { dimensionDirection, linearDimensionLength } from '@ifc-lite/drawing-2d';
 import type { Point2D } from '@/store/slices/drawing2DSlice';
-import { measuredDimensionValue, type Dimension2D, type Dimension2DOrientation } from '@/store/slices/drawing2DDimensions';
+import type { Dimension2D, Dimension2DOrientation } from '@/store/slices/drawing2DDimensions';
 import { isDegenerateMeasurement } from '@/store/slices/drawing2DDegenerateGuards';
-
-/** Unit direction of the dimension line; the offset runs along its left normal `(-dir.y, dir.x)`. */
-export function dimensionDirection(a: Point2D, b: Point2D, orientation: Dimension2DOrientation): Point2D {
-  if (orientation === 'horizontal') return { x: 1, y: 0 };
-  if (orientation === 'vertical') return { x: 0, y: 1 };
-  const len = Math.hypot(b.x - a.x, b.y - a.y);
-  return len > 1e-12 ? { x: (b.x - a.x) / len, y: (b.y - a.y) / len } : { x: 1, y: 0 };
-}
 
 export function placementOrientation(a: Point2D, b: Point2D, cursor: Point2D, lockAxis: boolean): Dimension2DOrientation {
   if (!lockAxis) return 'aligned';
@@ -32,13 +25,13 @@ export function placementOrientation(a: Point2D, b: Point2D, cursor: Point2D, lo
   const outX = Math.max(0, Math.abs(cursor.x - (a.x + b.x) / 2) - halfW);
   const outY = Math.max(0, Math.abs(cursor.y - (a.y + b.y) / 2) - halfH);
   const preferred: Dimension2DOrientation = outY >= outX ? 'horizontal' : 'vertical';
-  if (!isDegenerateMeasurement(measuredDimensionValue({ a, b, orientation: preferred }))) return preferred;
+  if (!isDegenerateMeasurement(linearDimensionLength({ a, b, orientation: preferred }))) return preferred;
   return preferred === 'horizontal' ? 'vertical' : 'horizontal';
 }
 
 /** Signed offset from the midpoint of a and b to the cursor, along the line's left normal. */
 export function placementOffset(a: Point2D, b: Point2D, orientation: Dimension2DOrientation, cursor: Point2D): number {
-  const dir = dimensionDirection(a, b, orientation);
+  const dir = dimensionDirection({ a, b, orientation });
   const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
   return (cursor.x - mid.x) * -dir.y + (cursor.y - mid.y) * dir.x;
 }

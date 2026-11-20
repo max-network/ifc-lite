@@ -7,6 +7,8 @@ import { transformPoint, type Transform2D } from '../svg-transform.js';
 import { escapeXml, svgNum } from '../svg-format.js';
 import { getLineStyle } from '../styles.js';
 import type { PlanSymbolKind } from './plan-types.js';
+import { dimensionsToSvg } from '../dimensions/dimension-svg.js';
+import { planDimensionGraphics } from './dimensions/chains.js';
 
 /** Pen per symbol kind: door/window linework as thin projection, room boundaries as fine dashed. */
 const SYMBOL_PENS: Record<PlanSymbolKind, { weight: number; dash?: string; color: string }> = {
@@ -18,8 +20,8 @@ const SYMBOL_PENS: Record<PlanSymbolKind, { weight: number; dash?: string; color
 /** Paper height of room labels, mm. */
 const LABEL_HEIGHT_MM = 2.5;
 
-/** The plan symbol and label layers of `drawing`, empty when it carries neither. */
-export function createPlanLayers(drawing: Drawing2D, transform: Transform2D): string {
+/** The plan symbol, label and dimension layers of `drawing`, empty when it carries none. */
+export function createPlanLayers(drawing: Drawing2D, transform: Transform2D, dimensions: { paperScale: number; format?: (metres: number) => string }): string {
   let svg = '';
   const symbols = drawing.planSymbols ?? [];
   if (symbols.length > 0) {
@@ -46,5 +48,7 @@ export function createPlanLayers(drawing: Drawing2D, transform: Transform2D): st
     }
     svg += '  </g>\n';
   }
+  const graphics = planDimensionGraphics(drawing.planDimensions ?? [], dimensions);
+  svg += dimensionsToSvg(graphics, (x, y) => transformPoint({ x, y }, transform), (mm) => mm);
   return svg;
 }

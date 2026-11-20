@@ -13,9 +13,10 @@ import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { IfcParser, type IfcDataStore } from '@ifc-lite/parser';
 import { StepExporter } from '@ifc-lite/export';
+import { linearDimensionGraphics } from '@ifc-lite/drawing-2d';
 import { useViewerStore } from '@/store/index.js';
 import type { Dimension2D } from '@/store/slices/drawing2DDimensions';
-import { dimensionGraphics, formatDimensionValue } from './dimension-graphics.js';
+import { formatDimensionValue } from './dimension-graphics.js';
 import { dimensionPaperScale, dimensionSaveParams, findInvalidDimension } from './dimension-markup-save.js';
 import { decodeDimensionPlane, decodeDimensionRef } from './dimension-markup-codec.js';
 import { saveDrawingMarkupToModel, type SaveMarkupInput } from './drawing-markup-save.js';
@@ -83,7 +84,7 @@ function exportStep(store: IfcDataStore): string {
 describe('dimensionSaveParams', () => {
   it('passes the shared graphics, laid out with the dimension\'s own section flip', () => {
     const params = dimensionSaveParams(DIM, { paperScale: 100, drawnPlane: { axis: 'down', position: 50, flipped: false } });
-    const expected = dimensionGraphics(DIM, {
+    const expected = linearDimensionGraphics(DIM, {
       paperScale: 100, format: (m) => formatDimensionValue(m), flip: { flipX: true, flipY: true },
     });
     assert.deepEqual(params.lines, expected.lines);

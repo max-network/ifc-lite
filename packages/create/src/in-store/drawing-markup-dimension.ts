@@ -7,7 +7,7 @@
  * `IfcAnnotation`, beside the other markup builders in `drawing-markup.ts`.
  *
  * The caller passes the dimension's drawn graphics already laid out (the
- * viewer computes them once with its `dimensionGraphics`, the same function
+ * viewer computes them once with `@ifc-lite/drawing-2d`'s `linearDimensionGraphics`, the same function
  * its canvas and exports draw from), so a generic IFC viewer shows the
  * dimension as drawn without knowing the layout rules.
  *

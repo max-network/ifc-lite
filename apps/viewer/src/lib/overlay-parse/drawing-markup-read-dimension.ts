@@ -14,7 +14,7 @@
  *
  * Offset comes from the geometry, not from `Pset_IfcLiteMarkup.Offset`: the
  * dimension line's midpoint sits exactly `offset` from the midpoint of a and b
- * along the dimension's left normal (`dimension-graphics.ts`), and measuring it
+ * along the dimension's left normal (`linearDimensionGraphics`), and measuring it
  * in the same frame the points were restored in keeps the line on the side it
  * was drawn even when that frame differs from the authored one by a
  * reflection (the symbolic parser's plan-Y negation, when no store is given to
@@ -26,13 +26,8 @@
  */
 
 import { fromNativeLength } from '@ifc-lite/create';
-import {
-  DIMENSION_2D_ORIENTATIONS,
-  isDimension2D,
-  measuredDimensionValue,
-  type Dimension2D,
-  type Dimension2DOrientation,
-} from '@/store/slices/drawing2DDimensions';
+import { dimensionDirection, linearDimensionLength } from '@ifc-lite/drawing-2d';
+import { DIMENSION_2D_ORIENTATIONS, isDimension2D, type Dimension2D } from '@/store/slices/drawing2DDimensions';
 import { decodeDimensionPlane, decodeDimensionRef } from '@/lib/drawing2d-markup/dimension-markup-codec';
 import type { DrawingMarkupAnnotationSource } from './drawing-markup-read.js';
 import type { DrawingMarkupPlacementAnchor } from './drawing-markup-read-placement.js';
@@ -43,15 +38,8 @@ function offsetFromDimensionLine(
   dim: Pick<Dimension2D, 'a' | 'b' | 'orientation'>,
   line: { start: { x: number; y: number }; end: { x: number; y: number } },
 ): number | null {
-  const dir = dim.orientation === 'horizontal' ? { x: 1, y: 0 }
-    : dim.orientation === 'vertical' ? { x: 0, y: 1 }
-      : (() => {
-        const dx = dim.b.x - dim.a.x;
-        const dy = dim.b.y - dim.a.y;
-        const len = Math.hypot(dx, dy);
-        return len > 1e-12 ? { x: dx / len, y: dy / len } : null;
-      })();
-  if (!dir) return null;
+  if (dim.orientation === 'aligned' && linearDimensionLength(dim) <= 1e-12) return null;
+  const dir = dimensionDirection(dim);
   const mx = (line.start.x + line.end.x) / 2 - (dim.a.x + dim.b.x) / 2;
   const my = (line.start.y + line.end.y) / 2 - (dim.a.y + dim.b.y) / 2;
   const offset = -dir.y * mx + dir.x * my;
@@ -64,8 +52,9 @@ export function readDimension(
 ): Dimension2D | null {
   if (source.lines.length < 1) return null;
   const props = source.properties;
-  const orientation = props?.get('Orientation');
-  if (!orientation || !(DIMENSION_2D_ORIENTATIONS as readonly string[]).includes(orientation)) return null;
+  const rawOrientation = props?.get('Orientation');
+  const orientation = DIMENSION_2D_ORIENTATIONS.find((o) => o === rawOrientation);
+  if (!orientation) return null;
   const offsetValue = props?.get('Offset');
   // `Number('')` is 0, so a blank value has to be refused before converting.
   if (offsetValue === undefined || offsetValue.trim() === '') return null;
@@ -75,7 +64,7 @@ export function readDimension(
   const author = (p: { x: number; y: number }) => toAuthoredPoint(source.expressId, anchor, { x: p.x, y: p.y });
   const a = author(source.lines[0].line.start);
   const b = author(source.lines[0].line.end);
-  const base = { a, b, orientation: orientation as Dimension2DOrientation };
+  const base = { a, b, orientation };
   const drawnLine = source.lines[1]?.line;
   const offset = (drawnLine && offsetFromDimensionLine(base, { start: author(drawnLine.start), end: author(drawnLine.end) }))
     ?? fromNativeLength(anchor, rawOffset);
@@ -98,7 +87,7 @@ export function readDimension(
   const rawDistance = source.quantities?.get('Distance');
   if (typeof rawDistance === 'number' && Number.isFinite(rawDistance)) {
     warnOnDerivedValueMismatch(
-      'dimension', source.expressId, 'Distance', fromNativeLength(anchor, rawDistance), measuredDimensionValue(candidate),
+      'dimension', source.expressId, 'Distance', fromNativeLength(anchor, rawDistance), linearDimensionLength(candidate),
     );
   }
   return candidate;

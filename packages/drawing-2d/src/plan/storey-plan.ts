@@ -18,6 +18,8 @@ import { DEFAULT_PLAN_CUT_HEIGHT, storeyCutElevation } from './storey-frame.js';
 import { buildOpeningSymbols, isOpeningFillingType } from './opening-symbols.js';
 import { buildSpaceAnnotations } from './space-annotations.js';
 import type { PlanLabel, PlanOpeningInfo, PlanSymbol } from './plan-types.js';
+import { buildPlanDimensions, planDimensionGraphics } from './dimensions/chains.js';
+import type { PlanDimensionOptions } from './dimensions/types.js';
 
 export interface StoreyPlanOptions {
   /** Storey floor level, IFC world Z in metres (e.g. `SpatialHierarchy.storeyElevations`). */
@@ -40,6 +42,8 @@ export interface StoreyPlanOptions {
   storeyElements?: ReadonlySet<number>;
   /** Draw spaces as room boundaries, labelled from `labels`. Omit to leave spaces out. */
   spaces?: { labels?: ReadonlyMap<number, string> };
+  /** Dimension the plan: facade chains (openings, grid, overall) and interior chains. Omit for none. */
+  dimensions?: PlanDimensionOptions;
   /** Options passed through to {@link Drawing2DGenerator.generate}. */
   generator?: Partial<GeneratorOptions>;
   /** Extruded profiles for clean projection lines, as {@link Drawing2DGenerator.generate} takes them. */
@@ -86,9 +90,15 @@ export async function generateStoreyPlan(meshes: readonly MeshData[], options: S
     labels.push(...rooms.labels);
   }
 
+  const planDimensions = options.dimensions ? buildPlanDimensions({ ...drawing, planSymbols: symbols, planLabels: labels }, options.dimensions) : [];
+
   let bounds = drawing.bounds;
   const symbolLines: Line2D[] = symbols.flatMap((s) => s.lines);
   for (const line of symbolLines) bounds = boundsExtendLine(bounds, line);
   for (const label of labels) bounds = boundsExtendPoint(bounds, label.position);
-  return { ...drawing, planSymbols: symbols, planLabels: labels, bounds };
+  for (const graphic of planDimensionGraphics(planDimensions, { paperScale: config.scale, format: options.dimensions?.format })) {
+    for (const [start, end] of [...graphic.lines, ...graphic.ticks]) bounds = boundsExtendLine(bounds, { start, end });
+    bounds = boundsExtendPoint(bounds, graphic.text.at);
+  }
+  return { ...drawing, planSymbols: symbols, planLabels: labels, planDimensions, bounds };
 }

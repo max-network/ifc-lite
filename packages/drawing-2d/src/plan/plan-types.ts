@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import type { ArchitecturalSymbol, Line2D, Point2D } from '../types.js';
+import type { PlanDimensionChain } from './dimensions/types.js';
 
 export type PlanSymbolKind = 'door' | 'window' | 'space';
 
@@ -36,4 +37,11 @@ export interface PlanOpeningInfo {
   width?: number;
   /** Host wall thickness in metres, for the window frame lines. Falls back to the window's own depth. */
   wallThickness?: number;
+}
+
+/** What `generateStoreyPlan` adds to a drawing: symbols, labels and, with its `dimensions` option, dimension chains. */
+export interface PlanAnnotations {
+  planSymbols: PlanSymbol[];
+  planLabels: PlanLabel[];
+  planDimensions: PlanDimensionChain[];
 }

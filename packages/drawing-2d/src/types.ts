@@ -6,7 +6,7 @@
  */
 
 import type { LineCategory, VisibilityState } from './line-classification.js';
-import type { PlanLabel, PlanSymbol } from './plan/plan-types.js';
+import type { PlanAnnotations } from './plan/plan-types.js';
 
 // VECTOR TYPES
 // ═══════════════════════════════════════════════════════════════════════════
@@ -273,7 +273,7 @@ export interface SectionCutResult {
 /**
  * Complete 2D drawing result
  */
-export interface Drawing2D {
+export interface Drawing2D extends Partial<PlanAnnotations> {
   /** Section configuration used */
   config: SectionConfig;
 
@@ -292,9 +292,6 @@ export interface Drawing2D {
 
   /** Projection polygons (visible surfaces beyond cut) */
   projectionPolygons: DrawingPolygon[];
-  /** Plan symbols (door swings, window frames, room boundaries) and labels; set by `generateStoreyPlan`. */
-  planSymbols?: PlanSymbol[];
-  planLabels?: PlanLabel[];
   /** Bounding box in 2D drawing space */
   bounds: Bounds2D;
 

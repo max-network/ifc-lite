@@ -12,19 +12,19 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { jsPDF } from 'jspdf';
-import { exportToDXF, parseDxf, DEFAULT_SECTION_CONFIG, type Drawing2D, type DxfEntity } from '@ifc-lite/drawing-2d';
+import {
+  exportToDXF,
+  parseDxf,
+  dimensionsToSvg,
+  DEFAULT_SECTION_CONFIG,
+  type DimensionMapPoint,
+  type Drawing2D,
+  type DxfEntity,
+} from '@ifc-lite/drawing-2d';
 import type { Dimension2D } from '@/store/slices/drawing2DDimensions';
 import { axisFlipForSection, type SectionAxis } from '@/hooks/pdfSectionLayout';
 import { formatDimensionValue } from '@/lib/drawing2d-markup/dimension-graphics';
-import {
-  DIMENSION_DXF_LAYER,
-  boundsWithDimensions,
-  dimensionGraphicsList,
-  dimensionsToSvg,
-  drawDimensionsPdf,
-  placeDimensionText,
-  type DimensionMapPoint,
-} from './dimension-export';
+import { DIMENSION_DXF_LAYER, dimensionGraphicsList, drawDimensionsPdf } from './dimension-export';
 
 /** 4 m along x at y = 2, dimension line 0.5 m to the left of a→b (+y). */
 const horizontal: Dimension2D = { id: 'h', a: { x: 1, y: 2 }, b: { x: 5, y: 2 }, offset: 0.5, orientation: 'aligned' };
@@ -51,32 +51,6 @@ function parseSvg(svg: string) {
 }
 
 describe('dimension SVG export', () => {
-  it('writes the lines, 45° ticks and value of a plan dimension at 1:100 in drawing metres', () => {
-    const { lines, texts } = parseSvg(dimensionsToSvg(graphics([horizontal], 100), flipMap('down'), (mm) => mm / 10));
-    const t = 0.125 * Math.SQRT1_2; // half a 2.5 mm tick at 1:100, per axis
-    assert.deepEqual(lines.map((l) => l.map((v) => Number(v.toFixed(4)))), [
-      [1, 2.5, 5, 2.5, 0.018], // dimension line
-      [1, 2.1, 1, 2.7, 0.018], // extension lines: 1 mm gap, 2 mm overshoot
-      [5, 2.1, 5, 2.7, 0.018],
-      // Plan (no flip, y down on paper): ticks run lower-left to upper-right as seen.
-      [Number((1 - t).toFixed(4)), Number((2.5 + t).toFixed(4)), Number((1 + t).toFixed(4)), Number((2.5 - t).toFixed(4)), 0.035],
-      [Number((5 - t).toFixed(4)), Number((2.5 + t).toFixed(4)), Number((5 + t).toFixed(4)), Number((2.5 - t).toFixed(4)), 0.035],
-    ]);
-    // Centre 1 mm + half the text height above the line on paper (smaller y).
-    assert.deepEqual(texts, [{ x: 3, y: 2.275, angle: 0, size: 0.25, value: '4000' }]);
-  });
-
-  it('keeps 2.5 mm text and 1 mm gaps on paper at 1:50 in sheet millimetres', () => {
-    // Sheet frame: 20 mm per metre at 1:50, translated by (10, 10).
-    const sheetMap: DimensionMapPoint = (x, y) => ({ x: x * 20 + 10, y: y * 20 + 10 });
-    const { lines, texts } = parseSvg(dimensionsToSvg(graphics([horizontal], 50), sheetMap, (mm) => mm));
-    assert.deepEqual(lines[0], [30, 60, 110, 60, 0.18]);
-    assert.deepEqual(lines[1], [30, 51, 30, 62, 0.18], 'gap 1 mm, overshoot 2 mm on paper');
-    const tick = Math.hypot(lines[3][2] - lines[3][0], lines[3][3] - lines[3][1]);
-    assert.ok(Math.abs(tick - 2.5) < 1e-3, `tick length on paper (to the SVG's 4 decimals): ${tick}`);
-    assert.deepEqual(texts, [{ x: 70, y: 57.75, angle: 0, size: 2.5, value: '4000' }]);
-  });
-
   it('turns text upright and keeps it above the line on a flipped elevation and a mirrored side section', () => {
     for (const axis of ['front', 'side'] as const) {
       const map = flipMap(axis);
@@ -85,18 +59,6 @@ describe('dimension SVG export', () => {
       assert.equal(texts[0].angle, 0, `${axis}: text reads left to right`);
       close(lineY - texts[0].y, 0.225, `${axis}: text sits above the dimension line on paper`);
     }
-  });
-
-  it('reads a vertical dimension bottom to top', () => {
-    const { texts } = parseSvg(dimensionsToSvg(graphics([vertical], 100), flipMap('down'), (mm) => mm / 10));
-    assert.equal(texts[0].angle, -90);
-    assert.equal(texts[0].value, '3000');
-  });
-
-  it('escapes a text override and writes nothing without dimensions', () => {
-    const svg = dimensionsToSvg(graphics([{ ...horizontal, text: 'a<b & "<>"' }], 100), flipMap('down'), (mm) => mm);
-    assert.match(svg, />a&lt;b &amp; &quot;4000&quot;<\/text>/);
-    assert.equal(dimensionsToSvg([], flipMap('down'), (mm) => mm), '');
   });
 });
 
@@ -208,44 +170,14 @@ describe('dimension PDF export', () => {
   });
 });
 
-describe('placeDimensionText', () => {
-  it('measures size and direction through the writer map', () => {
-    const [g] = graphics([horizontal], 100, 'side');
-    // Side sections mirror x on paper: the drawing baseline maps leftwards and is turned.
-    const placed = placeDimensionText(g.text, (x, y) => ({ x: -x * 10, y: -y * 10 }));
-    close(placed.angleDeg, 0, 'upright');
-    close(placed.size, 2.5, 'size in page mm');
-  });
-});
-
-describe('boundsWithDimensions', () => {
-  it('grows the drawing extent to hold a dimension placed beyond the geometry, and keeps it otherwise', () => {
-    const bounds = { min: { x: 0, y: 0 }, max: { x: 6, y: 3 } };
-    const far = { ...horizontal, offset: 100 };
-    const grown = boundsWithDimensions(bounds, graphics([far], 100));
-    // Dimension line at y = 102, extension overshoot 2 mm (0.2 m) past it, text above.
-    assert.ok(grown.max.y >= 102.2, `max y ${grown.max.y}`);
-    assert.deepEqual([grown.min.x, grown.min.y, grown.max.x], [0, 0, 6]);
-    assert.equal(boundsWithDimensions(bounds, []), bounds);
-    assert.deepEqual(boundsWithDimensions(bounds, graphics([horizontal], 100)), bounds, 'a dimension inside the extent changes nothing');
-  });
-});
-
-it('applies the DXF preflight rule to SVG, PDF and bounds too (#10020, #10077)', () => {
+it('applies the DXF preflight rule to the PDF too (#10020, #10077)', () => {
   const valid = dimensionGraphicsList([{ id: 'valid', a: { x: 0, y: 0 }, b: { x: 5, y: 0 }, offset: 0, orientation: 'aligned' }],
     { paperScale: 100, format: m => `${m} m` })[0];
   const zero = dimensionGraphicsList([{ id: 'zero', a: { x: 50, y: 50 }, b: { x: 50, y: 50 }, offset: 0, orientation: 'aligned' }],
     { paperScale: 100, format: m => `${m} m` })[0];
-  const map = (x: number, y: number) => ({ x, y });
-  const svg = dimensionsToSvg([zero, valid], map, mm => mm);
-  assert.equal((svg.match(/class="dimension"/g) ?? []).length, 1);
-  assert.match(svg, />5 m<\/text>/);
-  assert.doesNotMatch(svg, />0 m<\/text>/);
   const doc = new jsPDF();
-  drawDimensionsPdf(doc, [zero, valid], map);
+  drawDimensionsPdf(doc, [zero, valid], (x: number, y: number) => ({ x, y }));
   const pdf = doc.output();
   assert.match(pdf, /\(5 m\)/);
   assert.doesNotMatch(pdf, /\(0 m\)/);
-  const bounds = { min: { x: -1, y: -1 }, max: { x: 10, y: 10 } };
-  assert.deepEqual(boundsWithDimensions(bounds, [zero, valid]), bounds);
 });

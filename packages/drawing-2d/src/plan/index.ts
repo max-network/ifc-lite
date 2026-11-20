@@ -19,4 +19,5 @@ export {
   type MaterialCategory,
   type ResolvedHatch,
 } from './material-hatch.js';
-export type { PlanSymbol, PlanSymbolKind, PlanLabel, PlanOpeningInfo } from './plan-types.js';
+export type { PlanSymbol, PlanSymbolKind, PlanLabel, PlanOpeningInfo, PlanAnnotations } from './plan-types.js';
+export * from './dimensions/index.js';

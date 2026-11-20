@@ -5,7 +5,7 @@
 /**
  * Turn the store's `Dimension2D`s into what `@ifc-lite/create`'s
  * `addDimensionMarkupToStore` writes: the dimension's own fields plus its
- * drawn graphics, laid out by the same `dimensionGraphics` the canvas and the
+ * drawn graphics, laid out by the same `linearDimensionGraphics` the canvas and the
  * exports use, so the embedded annotation looks as drawn.
  *
  * Every dimension is saved, including one drawn on another cut: unlike an
@@ -16,10 +16,11 @@
  */
 
 import type { DimensionMarkupParams } from '@ifc-lite/create';
+import { linearDimensionGraphics } from '@ifc-lite/drawing-2d';
 import { axisFlipForSection } from '@/hooks/pdfSectionLayout';
 import { DIMENSION_2D_ORIENTATIONS, type Dimension2D } from '@/store/slices/drawing2DDimensions';
 import type { DrawnSectionPlane } from '@/store/slices/drawing2DSlice';
-import { dimensionGraphics, formatDimensionValue } from './dimension-graphics.js';
+import { formatDimensionValue } from './dimension-graphics.js';
 import { encodeDimensionPlane, encodeDimensionRef } from './dimension-markup-codec.js';
 
 export type DimensionSaveParams = { id: string } & DimensionMarkupParams;
@@ -43,7 +44,7 @@ export function dimensionPaperScale(state: {
 
 export function dimensionSaveParams(dim: Dimension2D, layout: DimensionSaveLayout): DimensionSaveParams {
   const plane = dim.plane ?? layout.drawnPlane ?? undefined;
-  const graphics = dimensionGraphics(dim, {
+  const graphics = linearDimensionGraphics(dim, {
     paperScale: layout.paperScale,
     format: (metres) => formatDimensionValue(metres, layout.unitDisplayOverrides),
     flip: plane ? axisFlipForSection(plane.axis) : undefined,

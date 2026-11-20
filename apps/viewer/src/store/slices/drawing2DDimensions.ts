@@ -14,11 +14,12 @@
  *
  * A dimension stores only what the user placed: the two measured points, the
  * signed offset of the dimension line and its orientation. The measured value
- * is always derived (`lib/drawing2d-markup/dimension-graphics.ts`), never
+ * is always derived (`linearDimensionLength` in `@ifc-lite/drawing-2d`), never
  * stored, so a stored value can never disagree with the drawn geometry.
  */
 
 import type { StateCreator } from 'zustand';
+import { linearDimensionLength } from '@ifc-lite/drawing-2d';
 import type { Drawing2DSlice, DrawnSectionPlane, Point2D } from './drawing2DSlice';
 import { isFiniteNumber, isPoint2D } from './drawing2DSlice.markupValidation.js';
 import { isDegenerateMeasurement } from './drawing2DDegenerateGuards';
@@ -88,15 +89,6 @@ export interface Dimension2DActions {
 
 export function getDefaultDimension2DState(): Dimension2DState {
   return { dimensions2D: [], dimension2DPoints: [], dimension2DUndo: [], dimension2DRedo: [] };
-}
-
-/** The value a dimension measures, in metres: the a→b distance projected onto its orientation. */
-export function measuredDimensionValue(dim: Pick<Dimension2D, 'a' | 'b' | 'orientation'>): number {
-  const dx = dim.b.x - dim.a.x;
-  const dy = dim.b.y - dim.a.y;
-  if (dim.orientation === 'horizontal') return Math.abs(dx);
-  if (dim.orientation === 'vertical') return Math.abs(dy);
-  return Math.hypot(dx, dy);
 }
 
 /**
@@ -185,7 +177,7 @@ const isValidPlacement = (dim: Pick<Dimension2D, 'a' | 'b' | 'offset' | 'orienta
  * horizontally aligned points would measure 0 and collapse to a point).
  */
 function isUsableDimension(dimension: Dimension2D): boolean {
-  return isValidPlacement(dimension) && !isDegenerateMeasurement(measuredDimensionValue(dimension));
+  return isValidPlacement(dimension) && !isDegenerateMeasurement(linearDimensionLength(dimension));
 }
 
 export function createDimension2DActions(

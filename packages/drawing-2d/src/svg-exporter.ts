@@ -60,6 +60,8 @@ export interface SVGExportOptions {
   underlays?: SVGUnderlayOptions[];
   /** Material category per `materialId` or `entityId`: cut polygons are hatched by category. */
   materialCategories?: ReadonlyMap<number, MaterialCategory>;
+  /** Formats plan dimension values in metres. Default whole millimetres. */
+  dimensionFormat?: (metres: number) => string;
 }
 
 /** One DXF reference underlay to composite under the drawing. */
@@ -151,7 +153,7 @@ export class SVGExporter {
     if (cutLines.length > 0) {
       svg += this.createLineLayer('cut-lines', cutLines, transform, 'Cut Lines');
     }
-    svg += createPlanLayers(drawing, transform);
+    svg += createPlanLayers(drawing, transform, { paperScale: scale.factor, format: options.dimensionFormat });
 
     // Title block
     if (showTitleBlock) {

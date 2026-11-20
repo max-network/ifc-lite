@@ -18,7 +18,6 @@ import {
   isDimensionOnPlane,
   dimensionPlaneStamp,
   exportableDimensions,
-  measuredDimensionValue,
   moveDimension2D,
   type Dimension2D,
 } from './drawing2DDimensions.js';
@@ -201,15 +200,6 @@ describe('dimension selection, delete and move', () => {
     assert.equal(s.getState().dimensions2D.length, 0);
     assert.equal(s.getState().measure2DResults.length, 1);
     assert.equal(s.getState().selectedAnnotation2D?.type, 'measure', 'another kind\'s selection is kept');
-  });
-});
-
-describe('measuredDimensionValue', () => {
-  it('projects a→b on the orientation', () => {
-    const d = { a: { x: 0, y: 0 }, b: { x: 3, y: -4 } };
-    assert.equal(measuredDimensionValue({ ...d, orientation: 'aligned' }), 5);
-    assert.equal(measuredDimensionValue({ ...d, orientation: 'horizontal' }), 3);
-    assert.equal(measuredDimensionValue({ ...d, orientation: 'vertical' }), 4);
   });
 });
 
