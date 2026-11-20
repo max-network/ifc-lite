@@ -31,7 +31,7 @@ import { SectionCutter } from './section-cutter.js';
 import { PolygonBuilder } from './polygon-builder.js';
 import { OpenSurfaceIndex } from './open-surface.js';
 import { EdgeExtractor } from './edge-extractor.js';
-import { HiddenLineClassifier } from './hidden-line.js';
+import { HiddenLineClassifier, type HiddenLineOptions } from './hidden-line.js';
 import { mergeDrawingLines } from './line-merger.js';
 import { HatchGenerator } from './hatch-generator.js';
 import { SVGExporter } from './svg-exporter.js';
@@ -94,6 +94,8 @@ export interface GeneratorOptions {
   extraLines?: DrawingLine[];
   /** Which meshes are drawn. Type-library geometry is dropped unless `includeTypeLibrary` (#2058). */
   elementFilter?: DrawingElementFilter;
+  /** Hidden-line removal settings for this drawing; the generator's defaults otherwise. */
+  hiddenLine?: Partial<HiddenLineOptions>;
   /** Progress callback */
   onProgress?: (stage: string, progress: number) => void;
 }
@@ -340,7 +342,8 @@ export class Drawing2DGenerator {
         ? meshes.map(mesh => clipMeshToProjectionWindow(mesh, config.plane, 0, occluderDepth))
           .filter((mesh): mesh is MeshData => mesh !== null)
         : meshes;
-      this.hiddenLineClassifier.buildDepthBuffer(occluders, config.plane, occluderDepth, bounds);
+      const classifier = opts.hiddenLine ? new HiddenLineClassifier({ resolution: 1024, ...opts.hiddenLine }) : this.hiddenLineClassifier;
+      classifier.buildDepthBuffer(occluders, config.plane, occluderDepth, bounds);
 
       // Occlusion only DOWNGRADES visible → hidden; it can never reveal an
       // already-dashed OVERHEAD line. So classify the visible (below-cut)
@@ -353,7 +356,7 @@ export class Drawing2DGenerator {
       // would both skip them AND drop them from the recombination below.
       const toClassify = classifiable.filter((l) => l.visibility === 'visible');
       const passthrough = classifiable.filter((l) => l.visibility !== 'visible');
-      const classified = this.hiddenLineClassifier.applyVisibility(toClassify);
+      const classified = classifier.applyVisibility(toClassify);
       // SDK hidden-output filtering applies to occlusion results. Existing
       // overhead outlines keep their dashed convention even with HLR off.
       const classifiedLines = config.clipProjectionBands && !opts.includeHiddenLines
