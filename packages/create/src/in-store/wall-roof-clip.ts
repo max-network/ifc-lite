@@ -10,7 +10,7 @@ import { getModelLengthUnitScale } from './edit/length-unit-scale.js';
 import { isRoofClipped, wallBaseSolid, ROOF_ATTACHMENT } from './edit/wall-base-solid.js';
 import { AnchorEntityReader } from './resolve-anchor.js';
 import { axis2d, axis3d, applyFrame, composeFrame, inverseFrame, placementInAncestor, pointOf, refId, type Vec3 } from './host-geometry-frame.js';
-import { readFootprintRoofInStore, planFootprintRoofNative, emitFootprintRoofBody } from './roof-footprint.js';
+import { readFootprintRoofInStore, planFootprintRoofNative, emitFootprintRoofBody, type FootprintRoofDefinition } from './roof-footprint.js';
 import { heightAt, type FootprintRoofPlan, type PlanPoint } from './roof-footprint-plan.js';
 
 type ReadTarget = Pick<EditTarget, 'dataStore' | 'view'>;
@@ -132,19 +132,20 @@ export interface WallTopPoint {
  * The top of a wall `clipWallToRoof` cut to `roofId`, along the wall's own x axis from one end of its body to the
  * other: the roof underside over the lower of its two faces, capped by the extrusion. Between two points the top is
  * straight. Null when the wall carries no cut of ours or the roof is not one by footprint. Without a view it reads
- * the file as saved.
+ * the file as saved. Given `as`, the roof's definition after an edit, it reads the top the wall would get, uncapped.
  */
-export function readRoofClippedWallTop(store: IfcDataStore, view: MutablePropertyView | null | undefined, wallId: number, roofId: number): WallTopPoint[] | null {
+export function readRoofClippedWallTop(store: IfcDataStore, view: MutablePropertyView | null | undefined, wallId: number, roofId: number,
+  as?: FootprintRoofDefinition): WallTopPoint[] | null {
   const target = { dataStore: store, view: view ?? sourceView(store) };
   if (!isRoofClipped(store, target.view, wallId)) return null;
-  const definition = readFootprintRoofInStore(store, roofId, target.view);
+  const definition = as ?? readFootprintRoofInStore(store, roofId, target.view);
   if (!definition) return null;
   const scale = getModelLengthUnitScale(store);
   const plan = planFootprintRoofNative({ lengthUnitScale: scale }, definition);
   const wallToRoof = composeFrame(inverseFrame(frame(target, roofId)), frame(target, wallId));
   const { solid } = body(target, wallId);
   const corners = boundary(target, solid);
-  const depth = Number(solid.attributes[3]);
+  const depth = as ? Infinity : Number(solid.attributes[3]);
   const base = Math.min(...corners.map(p => p[2]));
   const xs = corners.map(p => p[0]), ys = corners.map(p => p[1]);
   const [x0, x1] = [Math.min(...xs), Math.max(...xs)];

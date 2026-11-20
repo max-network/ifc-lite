@@ -9,6 +9,7 @@ import { addWallToStore } from './wall.js';
 import { setTopConstraintInStore } from './storey/storey-top-constraint.js';
 import { readWallJoinTarget } from './wall-join-read.js';
 import { readRoofClippedWallTop } from './wall-roof-clip.js';
+import { readFootprintRoofInStore } from './roof-footprint.js';
 
 const SLOPE = Math.PI / 6;
 
@@ -47,6 +48,16 @@ describe('a wall cut to a roof underside', () => {
     const reopened = await parse(exportText(s));
     const profile = readRoofClippedWallTop(reopened, null, wallId, roofId);
     expect(Math.max(...(profile ?? []).map((p) => p.height))).toBeCloseTo(3 + 4 * Math.tan(SLOPE), 6);
+  });
+
+  it('reads the top the wall would get under the roof as an edit would leave it', async () => {
+    const { s, roofId, wallId } = await gableWall();
+    const current = readFootprintRoofInStore(s.store, roofId, s.view);
+    const flatter = Math.PI / 12;
+    const profile = current && readRoofClippedWallTop(s.store, s.view, wallId, roofId, { ...current, EdgeSlopes: [flatter, 0, flatter, 0] });
+    expect(Math.max(...(profile ?? []).map((p) => p.height))).toBeCloseTo(3 + 4 * Math.tan(flatter), 6);
+    const steeper = current && readRoofClippedWallTop(s.store, s.view, wallId, roofId, { ...current, EdgeSlopes: [Math.PI / 4, 0, Math.PI / 4, 0] });
+    expect(Math.max(...(steeper ?? []).map((p) => p.height))).toBeCloseTo(3 + 4, 6);
   });
 
   it('reads no top for a wall the roof does not cut', async () => {
