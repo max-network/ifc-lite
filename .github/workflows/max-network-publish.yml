@@ -78,8 +78,14 @@ jobs:
       - name: Build every package
         run: pnpm turbo build --filter='./packages/*'
 
-      - name: Typecheck and test the selected packages
-        run: pnpm turbo typecheck test ${{ steps.select.outputs.filters }}
+      # One package at a time: the worker-backed suites (pointcloud's real
+      # decode worker) hit their 5 s budgets when turbo runs them side by side
+      # on a hosted runner.
+      - name: Typecheck the selected packages
+        run: pnpm turbo typecheck ${{ steps.select.outputs.filters }}
+
+      - name: Test the selected packages
+        run: pnpm turbo test --concurrency=1 ${{ steps.select.outputs.filters }}
 
       - name: Publish
         env:
