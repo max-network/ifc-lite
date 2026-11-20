@@ -49,6 +49,7 @@ import {
   emitRectangleProfile,
   emitRelContainedInSpatialStructure,
   emitSurfaceStyle,
+  GLAZING_COLOR,
   ownerHistoryRef,
   productGuid,
 } from './_emit-helpers.js';
@@ -65,8 +66,6 @@ type Attrs = Parameters<StoreEditor['addEntity']>[1];
 
 const DEFAULT_MULLION: ProfileSection = { Type: 'Rectangle', XDim: 0.05, YDim: 0.15 };
 const DEFAULT_PANEL_THICKNESS = 0.024;
-/** A faint blue-grey float glass. */
-const DEFAULT_PANEL_GLAZING = { red: 0.62, green: 0.76, blue: 0.84, alpha: 0.28 };
 /** Widest bay the default U grid makes (metres). */
 const DEFAULT_MAX_BAY = 1.5;
 const EPS = 1e-9;
@@ -319,7 +318,7 @@ export function addCurtainWallToStore(
   // Panels: one rectangle per clear width (shared between panels of the same width).
   // Every panel carries the same glazing style, so the wall reads as glass here and
   // in the exported file, as a hosted window does.
-  const glazing = emitSurfaceStyle(editor, registry.name, DEFAULT_PANEL_GLAZING, 'Curtain wall glazing');
+  const glazing = emitSurfaceStyle(editor, registry.name, GLAZING_COLOR, 'Curtain wall glazing');
   const panelProfiles = new Map<number, number>();
   const panelIds = layout.panels.map((p, i) => {
     const width = n(snap(p.u1 - p.u0));

@@ -116,7 +116,7 @@ export function addMaterialToStore(
 const HEX_COLOR = /^#?(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
 /** A hex string or channels, refused rather than baked into the file as black when malformed. */
-function parseMaterialColor(color: SurfaceStyleColor | string, op: string): SurfaceStyleColor {
+export function parseMaterialColor(color: SurfaceStyleColor | string, op: string): SurfaceStyleColor {
   if (typeof color !== 'string') {
     if (![color.red, color.green, color.blue, color.alpha ?? 1].every(v => Number.isFinite(v) && v >= 0 && v <= 1)) {
       throw new Error(`${op}: Color channels must be numbers in 0..1`);
