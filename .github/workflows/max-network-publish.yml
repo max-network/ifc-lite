@@ -70,8 +70,14 @@ jobs:
           echo "list=$LIST" >> "$GITHUB_OUTPUT"
           echo "filters=$FILTERS" >> "$GITHUB_OUTPUT"
 
-      - name: Build, typecheck and test the selected packages
-        run: pnpm turbo build typecheck test ${{ steps.select.outputs.filters }}
+      # Typecheck reads sibling sources through path maps (sdk reaches
+      # sandbox, which reaches extensions) beyond its declared ^build graph,
+      # so every package is built first, as upstream CI does.
+      - name: Build every package
+        run: pnpm turbo build --filter='./packages/*'
+
+      - name: Typecheck and test the selected packages
+        run: pnpm turbo typecheck test ${{ steps.select.outputs.filters }}
 
       - name: Publish
         env:
