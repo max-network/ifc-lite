@@ -53,12 +53,18 @@ export interface HiddenLineOptions {
   samplesPerLine: number;
   /** Depth bias to avoid z-fighting */
   depthBias: number;
+  /** Extra bias in raster cells: a line lying on a surface steep to the view keeps its own surface's cell from hiding it. Default 0. */
+  cellBias: number;
+  /** Longest distance between two samples along a line, world units; a long line then splits where it is hidden, not a tenth of its length away. Default: none. */
+  sampleSpacing: number;
 }
 
 const DEFAULT_OPTIONS: HiddenLineOptions = {
   resolution: 1024,
   samplesPerLine: 10,
   depthBias: 0.001,
+  cellBias: 0,
+  sampleSpacing: Infinity,
 };
 
 /**
@@ -191,7 +197,8 @@ export class HiddenLineClassifier {
   // ═══════════════════════════════════════════════════════════════════════════
 
   private classifySingleLine(line: DrawingLine): VisibilityResult {
-    const { samplesPerLine, depthBias } = this.options;
+    const { samplesPerLine, sampleSpacing } = this.options;
+    const depthBias = this.effectiveBias();
     const lineLength = point2DDistance(line.line.start, line.line.end);
 
     // View depth varies along the line when the producer supplied a
@@ -199,7 +206,7 @@ export class HiddenLineClassifier {
     const depthAt = lineDepthAt(line);
 
     // For very short lines, just test the midpoint
-    const numSamples = lineLength < EPSILON ? 1 : Math.max(2, samplesPerLine);
+    const numSamples = lineLength < EPSILON ? 1 : Math.max(2, samplesPerLine, Math.ceil(lineLength / sampleSpacing));
 
     const segments: VisibilitySegment[] = [];
     let currentStart = line.line.start;
@@ -266,6 +273,14 @@ export class HiddenLineClassifier {
     }
 
     return { line, segments, overallVisibility };
+  }
+
+  private effectiveBias(): number {
+    const { depthBias, cellBias } = this.options;
+    const raster = this.raster;
+    if (!raster || cellBias <= 0) return depthBias;
+    const cell = Math.max((raster.bounds.max.x - raster.bounds.min.x) / raster.width, (raster.bounds.max.y - raster.bounds.min.y) / raster.height);
+    return Number.isFinite(cell) ? depthBias + cellBias * cell : depthBias;
   }
 
   private sampleVisibility(point: Point2D, lineDepth: number, depthBias: number): boolean {

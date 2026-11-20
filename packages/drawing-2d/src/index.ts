@@ -120,6 +120,7 @@ export type { StoreyFloorMesh } from './storey-bands.js';
 export { isFeatureElementType } from './feature-elements.js';
 
 export * from './plan/index.js';
+export * from './vertical/index.js';
 export * from './dimensions/index.js';
 export { parseDoorOperation, parseWindowPartitioning } from './openings/operation-types.js';
 
