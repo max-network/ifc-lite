@@ -12,7 +12,8 @@ import {
 } from '../../dimensions/linear-dimension.js';
 import { principalFrame, sideFrame, type PlanFrame } from './frame.js';
 import { facadeRuns, facadeStations, type FacadeFilling, type FacadeStation } from './facade.js';
-import { outlineSpan, roomStations, scanIntervals, type LocalPolygon, type LocalSegment, type ScanAxis } from './interior.js';
+import { outlineSpan, roomSpan, roomStations, scanIntervals, type LocalPolygon, type LocalSegment, type ScanAxis } from './interior.js';
+import { chainCrossings, isPlanObstacle, obstacleSegments } from './obstacles.js';
 import type { PlanDimensionChain, PlanDimensionKind, PlanDimensionOptions, PlanDimensionSide, PlanGridAxis } from './types.js';
 
 const SIDES: readonly PlanDimensionSide[] = ['top', 'right', 'bottom', 'left'];
@@ -120,7 +121,7 @@ interface RoomLabel {
   outline: readonly LocalSegment[];
 }
 
-function interiorChains(polygons: readonly LocalPolygon[], labels: readonly RoomLabel[], ctx: ChainContext): PlanDimensionChain[] {
+function interiorChains(polygons: readonly LocalPolygon[], labels: readonly RoomLabel[], obstacles: readonly LocalSegment[], ctx: ChainContext): PlanDimensionChain[] {
   const m = (paperMm: number) => (paperMm * ctx.scale) / 1000;
   const walls = new Set<string>();
   const chains: PlanDimensionChain[] = [];
@@ -131,33 +132,64 @@ function interiorChains(polygons: readonly LocalPolygon[], labels: readonly Room
     const direction = axis === 'u' ? ctx.frame.u : ctx.frame.v;
     chains.push({ kind: 'interior', direction, segments: chainSegments(anchors, direction, anchors[0], ctx) });
   };
+  const band = m(DIMENSION_PAPER_MM.textHeight + 2 * DIMENSION_PAPER_MM.textGap);
+  const step = m(DIMENSION_PAPER_MM.textHeight);
   if (labels.length === 0) {
     const ys = polygons.flatMap((poly) => poly[0]?.map((p) => p.y) ?? []);
     const xs = polygons.flatMap((poly) => poly[0]?.map((p) => p.x) ?? []);
     if (xs.length === 0) return [];
-    const through = (axis: ScanAxis, at: number) => {
-      const intervals = scanIntervals(polygons, axis, at);
-      if (intervals.length >= 2) add(axis, at, intervals.flat());
+    const through = (axis: ScanAxis, lo: number, hi: number) => {
+      const mid = (lo + hi) / 2;
+      const levels = [mid];
+      for (let k = 1; k * step < (hi - lo) / 2; k++) levels.push(mid - k * step, mid + k * step);
+      let best: { at: number; intervals: [number, number][]; hits: number } | undefined;
+      for (const at of levels) {
+        const intervals = scanIntervals(polygons, axis, at);
+        if (intervals.length < 2) continue;
+        const hits = chainCrossings(obstacles, axis, at, intervals[0][0], intervals[intervals.length - 1][1], band);
+        if (!best || hits < best.hits) best = { at, intervals, hits };
+        if (hits === 0) break;
+      }
+      if (best) add(axis, best.at, best.intervals.flat());
     };
-    through('u', (Math.min(...ys) + Math.max(...ys)) / 2);
-    through('v', (Math.min(...xs) + Math.max(...xs)) / 2);
+    through('u', Math.min(...ys), Math.max(...ys));
+    through('v', Math.min(...xs), Math.max(...xs));
     return chains;
   }
   const margin = m(DIMENSION_PAPER_MM.textHeight + 3 * DIMENSION_PAPER_MM.textGap);
   const inRoom = (wanted: number, span: [number, number] | undefined) =>
     span && span[1] - span[0] > 2 * margin ? Math.min(Math.max(wanted, span[0] + margin), span[1] - margin) : wanted;
+  const place = (axis: ScanAxis, label: RoomLabel, from: number, inside: number, clearance: number): number => {
+    const room = outlineSpan(label.outline, axis === 'u' ? 'v' : 'u', inside, from);
+    const wanted = inRoom(from - clearance, room);
+    if (obstacles.length === 0) return wanted;
+    const reach = room ? room[1] - room[0] : 0;
+    const candidates = [from - clearance, from + clearance];
+    for (let k = 1; k * step < reach; k++) candidates.push(from - clearance - k * step, from + clearance + k * step);
+    let best = { at: wanted, hits: Infinity };
+    for (const candidate of candidates) {
+      const at = inRoom(candidate, room);
+      if (at !== wanted && Math.abs(at - from) < clearance - 1e-9) continue;
+      const span = roomSpan(polygons, axis, at, inside, label.outline);
+      if (!span) continue;
+      const hits = chainCrossings(obstacles, axis, at, span[0], span[1], band);
+      if (hits < best.hits) best = { at, hits };
+      if (hits === 0) break;
+    }
+    return best.at;
+  };
   for (const label of labels) {
     const p = ctx.frame.toLocal(label.position);
-    const across = inRoom(p.y - m(LABEL_CLEARANCE_MM), outlineSpan(label.outline, 'v', p.x, p.y));
+    const across = place('u', label, p.y, p.x, m(LABEL_CLEARANCE_MM));
     add('u', across, roomStations(polygons, 'u', across, p.x, walls, label.outline));
-    const beside = inRoom(p.x - m((label.text.length * LABEL_CHAR_MM) / 2 + LABEL_CLEARANCE_MM), outlineSpan(label.outline, 'u', p.y, p.x));
+    const beside = place('v', label, p.x, p.y, m((label.text.length * LABEL_CHAR_MM) / 2 + LABEL_CLEARANCE_MM));
     add('v', beside, roomStations(polygons, 'v', beside, p.y, walls, label.outline));
   }
   return chains;
 }
 
 /** Dimension chains of a storey plan: per facade the openings, grid and overall chains, plus interior chains through the rooms. */
-export function buildPlanDimensions(drawing: Pick<Drawing2D, 'cutPolygons' | 'planLabels' | 'config'> & Partial<Pick<Drawing2D, 'planSymbols'>>, options: PlanDimensionOptions = {}): PlanDimensionChain[] {
+export function buildPlanDimensions(drawing: Pick<Drawing2D, 'cutPolygons' | 'planLabels' | 'config'> & Partial<Pick<Drawing2D, 'planSymbols' | 'lines'>>, options: PlanDimensionOptions = {}): PlanDimensionChain[] {
   const fabric = drawing.cutPolygons.filter(options.fabric ?? isPlanFabric).filter((p) => p.polygon.outer.length >= 3);
   if (fabric.length === 0) return [];
   const frame = principalFrame(fabric.map((p) => p.polygon.outer));
@@ -178,7 +210,8 @@ export function buildPlanDimensions(drawing: Pick<Drawing2D, 'cutPolygons' | 'pl
       outlines.set(symbol.entityId, list);
     }
     const labels = (drawing.planLabels ?? []).filter((l) => l.kind === 'space').map((l) => ({ position: l.position, text: l.text, outline: outlines.get(l.entityId) ?? [] }));
-    chains.push(...interiorChains(local, labels, ctx));
+    const obstacles = obstacleSegments(drawing, options.obstacle ?? isPlanObstacle, frame.toLocal);
+    chains.push(...interiorChains(local, labels, obstacles, ctx));
   }
   return chains;
 }

@@ -60,18 +60,20 @@ export function outlineSpan(outline: readonly LocalSegment[], axis: ScanAxis, at
   return Number.isFinite(lo) && Number.isFinite(hi) ? [lo, hi] : undefined;
 }
 
-/**
- * A room's chain along a scan line: its clear span (from its outline when given, else the gap between walls
- * around `inside`), plus each adjacent wall that is interior and not yet in `walls`.
- */
-export function roomStations(polygons: readonly LocalPolygon[], axis: ScanAxis, at: number, inside: number, walls: Set<string>, outline: readonly LocalSegment[] = []): number[] {
+/** A room's clear span along a scan line: from its outline when given, else the gap between walls around `inside`. */
+export function roomSpan(polygons: readonly LocalPolygon[], axis: ScanAxis, at: number, inside: number, outline: readonly LocalSegment[] = []): [number, number] | undefined {
+  const span = outline.length > 0 ? outlineSpan(outline, axis, at, inside) : undefined;
+  if (span) return span;
   const intervals = scanIntervals(polygons, axis, at);
-  let span = outline.length > 0 ? outlineSpan(outline, axis, at, inside) : undefined;
-  if (!span) {
-    const k = intervals.findIndex((interval, i) => i + 1 < intervals.length && interval[1] < inside && intervals[i + 1][0] > inside);
-    if (k < 0) return [];
-    span = [intervals[k][1], intervals[k + 1][0]];
-  }
+  const k = intervals.findIndex((interval, i) => i + 1 < intervals.length && interval[1] < inside && intervals[i + 1][0] > inside);
+  return k < 0 ? undefined : [intervals[k][1], intervals[k + 1][0]];
+}
+
+/** A room's chain along a scan line: its clear span plus each adjacent wall that is interior and not yet in `walls`. */
+export function roomStations(polygons: readonly LocalPolygon[], axis: ScanAxis, at: number, inside: number, walls: Set<string>, outline: readonly LocalSegment[] = []): number[] {
+  const span = roomSpan(polygons, axis, at, inside, outline);
+  if (!span) return [];
+  const intervals = scanIntervals(polygons, axis, at);
   const [lo, hi] = span;
   const claim = (index: number): [number, number] | undefined => {
     const wall = intervals[index];
