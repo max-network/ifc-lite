@@ -3,9 +3,10 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * Anchored builder for IfcWindow — a free-standing rectangular sash.
- * Same shape as IfcDoor (thin extruded box) but a different IFC type +
- * a different attribute tail (`PartitioningType` / `UserDefinedPartitioningType`).
+ * Anchored builder for IfcWindow, free-standing. The body (`emitFillingBody`)
+ * is a lining ring, mullions/transoms per PartitioningType and glazing panes,
+ * or one box with `Detail: 'box'`; the attribute tail carries
+ * `PartitioningType` / `UserDefinedPartitioningType`.
  */
 
 import type { StoreEditor } from '@ifc-lite/mutations';
@@ -13,13 +14,11 @@ import { assertFinitePoint3 } from '../ifc-creator-math.js';
 import { toNativeLength, toNativePoint3, type SpatialAnchor } from './anchor.js';
 import {
   assertPositiveFinite,
-  emitBodyRepresentation,
-  emitExtrudedSolid,
   emitLocalPlacement,
-  emitRectangleProfile,
   emitRelContainedInSpatialStructure,
   ifcElementHeader,
 } from './_emit-helpers.js';
+import { emitFillingBody, type FillingDetailParams, type FillingPart } from './filling-body.js';
 
 /**
  * IfcWindowTypePartitioningEnum (IFC4). Anything outside this set is
@@ -40,7 +39,7 @@ export const WINDOW_PARTITIONING_ENUM: ReadonlySet<string> = new Set([
   'NOTDEFINED',
 ]);
 
-export interface WindowInStoreParams {
+export interface WindowInStoreParams extends FillingDetailParams {
   /** Sill-centre of the window, in storey-local coordinates. */
   Position: [number, number, number];
   Width: number;
@@ -68,6 +67,8 @@ export interface WindowBuildResult {
   solidId: number;
   shapeRepId: number;
   productShapeId: number;
+  /** The body's styled parts; empty for `Detail: 'box'`. */
+  parts: FillingPart[];
   relContainedId: number;
 }
 
@@ -85,6 +86,7 @@ export function addWindowToStore(
   // Params are metres; convert dimensioned fields (incl. the OverallWidth/
   // OverallHeight attributes emitted below) to the file's native length
   // unit before emit (see SpatialAnchor.lengthUnitScale).
+  const metres = { ...params, FrameThickness: params.FrameThickness ?? 0.05 };
   params = {
     ...params,
     Position: toNativePoint3(anchor, params.Position),
@@ -92,12 +94,8 @@ export function addWindowToStore(
     Height: toNativeLength(anchor, params.Height),
     FrameThickness: toNativeLength(anchor, params.FrameThickness ?? 0.05),
   };
-  const thickness = params.FrameThickness as number;
-
   const placementId = emitLocalPlacement(editor, anchor.storeyPlacementId, params.Position);
-  const profileId = emitRectangleProfile(editor, params.Width, thickness);
-  const solidId = emitExtrudedSolid(editor, profileId, params.Height);
-  const { shapeRepId, productShapeId } = emitBodyRepresentation(editor, anchor.bodyContextId, solidId);
+  const { profileId, solidId, shapeRepId, productShapeId, parts } = emitFillingBody(editor, anchor, { ...metres, kind: 'window' }, 'addWindowToStore');
 
   const attrs = ifcElementHeader(anchor.ownerHistoryId, placementId, productShapeId, params, 'Window', anchor.guidRandom);
   attrs.push(...windowAttributeTail(anchor.schema, params));
@@ -105,7 +103,7 @@ export function addWindowToStore(
   const windowId = editor.addEntity('IfcWindow', attrs as Parameters<StoreEditor['addEntity']>[1]).expressId;
   const relContainedId = emitRelContainedInSpatialStructure(editor, anchor.ownerHistoryId, windowId, anchor.storeyId, anchor.guidRandom);
 
-  return { windowId, placementId, profileId, solidId, shapeRepId, productShapeId, relContainedId };
+  return { windowId, placementId, profileId, solidId, shapeRepId, productShapeId, parts, relContainedId };
 }
 
 /**

@@ -7,7 +7,9 @@
  *
  * This variant places a door without cutting an opening in any wall;
  * `addHostedDoorToStore` (hosted-fill.ts) cuts the opening and fills it.
- * Geometry is a thin solid: `Width × FrameThickness × Height` extruded up.
+ * The body (`emitFillingBody`) spans `Width × FrameThickness × Height`: a
+ * lining, one leaf or two per OperationType and handles, or one box with
+ * `Detail: 'box'`.
  *
  * The IFC4 IfcDoor entity adds `OverallHeight`, `OverallWidth`,
  * `PredefinedType`, `OperationType`, `UserDefinedOperationType` to
@@ -20,13 +22,11 @@ import { assertFinitePoint3 } from '../ifc-creator-math.js';
 import { toNativeLength, toNativePoint3, type SpatialAnchor } from './anchor.js';
 import {
   assertPositiveFinite,
-  emitBodyRepresentation,
-  emitExtrudedSolid,
   emitLocalPlacement,
-  emitRectangleProfile,
   emitRelContainedInSpatialStructure,
   ifcElementHeader,
 } from './_emit-helpers.js';
+import { emitFillingBody, type FillingDetailParams, type FillingPart } from './filling-body.js';
 
 /**
  * IfcDoorTypeOperationEnum (IFC4). Anything outside this set is
@@ -56,7 +56,7 @@ export const DOOR_OPERATION_ENUM: ReadonlySet<string> = new Set([
   'NOTDEFINED',
 ]);
 
-export interface DoorInStoreParams {
+export interface DoorInStoreParams extends FillingDetailParams {
   /** Bottom-centre of the door leaf, in storey-local coordinates. */
   Position: [number, number, number];
   Width: number;
@@ -69,6 +69,8 @@ export interface DoorInStoreParams {
   OperationType?: string;
   /** Free-text label when OperationType === 'USERDEFINED'. Ignored otherwise. */
   UserDefinedOperationType?: string;
+  /** Draw a handle on each leaf (detailed body only). Defaults to true. */
+  Handle?: boolean;
   Name?: string;
   Description?: string;
   ObjectType?: string;
@@ -84,6 +86,8 @@ export interface DoorBuildResult {
   solidId: number;
   shapeRepId: number;
   productShapeId: number;
+  /** The body's styled parts; empty for `Detail: 'box'`. */
+  parts: FillingPart[];
   relContainedId: number;
 }
 
@@ -101,6 +105,7 @@ export function addDoorToStore(
   // Params are metres; convert dimensioned fields (incl. the OverallWidth/
   // OverallHeight attributes emitted below) to the file's native length
   // unit before emit (see SpatialAnchor.lengthUnitScale).
+  const metres = { ...params, FrameThickness: params.FrameThickness ?? 0.05 };
   params = {
     ...params,
     Position: toNativePoint3(anchor, params.Position),
@@ -108,14 +113,8 @@ export function addDoorToStore(
     Height: toNativeLength(anchor, params.Height),
     FrameThickness: toNativeLength(anchor, params.FrameThickness ?? 0.05),
   };
-  const thickness = params.FrameThickness as number;
-
   const placementId = emitLocalPlacement(editor, anchor.storeyPlacementId, params.Position);
-  // Profile centred at the placement origin so the leaf is bottom-
-  // centred — matches IfcCreator's free-standing door convention.
-  const profileId = emitRectangleProfile(editor, params.Width, thickness);
-  const solidId = emitExtrudedSolid(editor, profileId, params.Height);
-  const { shapeRepId, productShapeId } = emitBodyRepresentation(editor, anchor.bodyContextId, solidId);
+  const { profileId, solidId, shapeRepId, productShapeId, parts } = emitFillingBody(editor, anchor, { ...metres, kind: 'door' }, 'addDoorToStore');
 
   const attrs = ifcElementHeader(anchor.ownerHistoryId, placementId, productShapeId, params, 'Door', anchor.guidRandom);
   attrs.push(...doorAttributeTail(anchor.schema, params));
@@ -123,7 +122,7 @@ export function addDoorToStore(
   const doorId = editor.addEntity('IfcDoor', attrs as Parameters<StoreEditor['addEntity']>[1]).expressId;
   const relContainedId = emitRelContainedInSpatialStructure(editor, anchor.ownerHistoryId, doorId, anchor.storeyId, anchor.guidRandom);
 
-  return { doorId, placementId, profileId, solidId, shapeRepId, productShapeId, relContainedId };
+  return { doorId, placementId, profileId, solidId, shapeRepId, productShapeId, parts, relContainedId };
 }
 
 /**

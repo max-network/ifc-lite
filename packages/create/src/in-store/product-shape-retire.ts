@@ -9,7 +9,9 @@
  * (IfcShapeModel WR11), so leaving the old records behind exports a file
  * that fails schema validation. Only the representation structure is walked,
  * through its known reference slots, and a record anything live still
- * references is retained: shared type maps, contexts and styled items stay. */
+ * references is retained: shared type maps, contexts and shared styles stay.
+ * An item referenced only by the IfcStyledItems that colour it goes with
+ * them, and so does a style chain nothing else uses. */
 import type { IfcDataStore } from '@ifc-lite/parser';
 import type { StoreEditor } from '@ifc-lite/mutations';
 import { effectiveReferencers } from '@ifc-lite/export';
@@ -22,6 +24,11 @@ const OWNED_SLOTS: Readonly<Record<string, readonly number[]>> = {
   IFCSHAPEREPRESENTATION: [3],
   IFCMAPPEDITEM: [0, 1],
   IFCREPRESENTATIONMAP: [0, 1],
+  IFCSTYLEDITEM: [1],
+  IFCPRESENTATIONSTYLEASSIGNMENT: [0],
+  IFCSURFACESTYLE: [2],
+  IFCSURFACESTYLESHADING: [0],
+  IFCSURFACESTYLERENDERING: [0],
 };
 
 const RETIRE_WORK_LIMIT = 100_000;
@@ -47,7 +54,17 @@ export function retireProductShape(store: IfcDataStore, editor: StoreEditor, sha
     const id = pending.shift()!;
     const entity = reader.entity(id);
     if (!entity || entity.names.includes('GlobalId')) continue;
-    if (effectiveReferencers(store, view)(id).length > 0) continue;
+    const referencers = effectiveReferencers(store, view)(id);
+    const stylers = referencers.flatMap(ref => {
+      const styled = reader.entity(ref);
+      return styled?.type.toUpperCase() === 'IFCSTYLEDITEM' && refId(styled.attributes[0]) === id ? [{ ref, styles: styled.attributes[1] }] : [];
+    });
+    if (referencers.length > stylers.length) continue;
+    for (const styled of stylers) {
+      if (!editor.removeEntity(styled.ref)) continue;
+      removed.push(styled.ref);
+      pending.push(...slotRefs(styled.styles));
+    }
     if (!editor.removeEntity(id)) continue;
     removed.push(id);
     for (const slot of OWNED_SLOTS[entity.type.toUpperCase()] ?? []) pending.push(...slotRefs(entity.attributes[slot]));

@@ -11,8 +11,10 @@
  * The filling's ObjectPlacement is relative to the OPENING's placement, so
  * moving the opening along its host carries the door or window with it. Its
  * own frame is the conventional one for a door or window: X along the wall,
- * Y across the wall, Z up. The leaf is `Width × FrameThickness` centred in
- * the wall's body and extruded up by `Height`. The filling is contained in
+ * Y across the wall, Z up. Its body (`emitFillingBody`) spans
+ * `Width × FrameThickness × Height`, centred in the wall's body: lining,
+ * glazing and mullions or leaves and handles by default, one box with
+ * `Detail: 'box'`. The filling is contained in
  * the host's storey; the opening, per IFC, is not.
  */
 
@@ -21,14 +23,12 @@ import { generateIfcGuid } from '@ifc-lite/encoding';
 import { toNativeLength, type HostAnchor } from './anchor.js';
 import {
   assertPositiveFinite,
-  emitBodyRepresentation,
-  emitExtrudedSolid,
   emitLocalPlacement,
-  emitRectangleProfile,
   emitRelContainedInSpatialStructure,
   ifcElementHeader,
   ownerHistoryRef,
 } from './_emit-helpers.js';
+import { emitFillingBody, type FillingBodySpec, type FillingPart } from './filling-body.js';
 import { addOpeningToStore, type OpeningBuildResult } from './opening.js';
 import { doorAttributeTail, type DoorInStoreParams } from './door.js';
 import { windowAttributeTail, type WindowInStoreParams } from './window.js';
@@ -62,6 +62,8 @@ export interface HostedFillBuildResult {
   solidId: number;
   shapeRepId: number;
   productShapeId: number;
+  /** The body's styled parts (lining, glazing, mullions, leaves, handles); empty for `Detail: 'box'`. */
+  parts: FillingPart[];
   relContainedId: number;
   relFillsId: number;
   opening: OpeningBuildResult;
@@ -88,7 +90,8 @@ function addHostedFill(
   host: HostAnchor,
   type: 'IfcDoor' | 'IfcWindow',
   sill: number,
-  params: HostedPlacementParams & Pick<DoorInStoreParams, 'Width' | 'Height' | 'FrameThickness' | 'Name' | 'Description' | 'ObjectType' | 'Tag' | 'GlobalId'>,
+  params: HostedPlacementParams & Pick<DoorInStoreParams, 'Width' | 'Height' | 'FrameThickness' | 'Name' | 'Description' | 'ObjectType' | 'Tag' | 'GlobalId'>
+    & Omit<FillingBodySpec, 'kind' | 'Width' | 'Height' | 'FrameThickness'>,
   tail: (native: { Width: number; Height: number }) => unknown[],
 ): HostedFillBuildResult {
   const op = type === 'IfcDoor' ? 'addHostedDoorToStore' : 'addHostedWindowToStore';
@@ -115,9 +118,10 @@ function addHostedFill(
   const placementId = emitLocalPlacement(editor, opening.placementId, [0, 0, opening.cutDepth / 2], [0, 1, 0], [1, 0, 0]);
   const width = toNativeLength(host, params.Width);
   const height = toNativeLength(host, params.Height);
-  const profileId = emitRectangleProfile(editor, width, toNativeLength(host, frameThickness));
-  const solidId = emitExtrudedSolid(editor, profileId, height);
-  const { shapeRepId, productShapeId } = emitBodyRepresentation(editor, host.bodyContextId, solidId);
+  const body = emitFillingBody(editor, host, {
+    ...params, kind: type === 'IfcDoor' ? 'door' : 'window', FrameThickness: frameThickness,
+  }, op);
+  const { profileId, solidId, shapeRepId, productShapeId, parts } = body;
 
   const attrs = ifcElementHeader(host.ownerHistoryId, placementId, productShapeId, params, label, host.guidRandom);
   attrs.push(...tail({ Width: width, Height: height }));
@@ -133,5 +137,5 @@ function addHostedFill(
   ]).expressId;
   const relContainedId = emitRelContainedInSpatialStructure(editor, host.ownerHistoryId, fillingId, host.storeyId, host.guidRandom);
 
-  return { fillingId, placementId, profileId, solidId, shapeRepId, productShapeId, relContainedId, relFillsId, opening };
+  return { fillingId, placementId, profileId, solidId, shapeRepId, productShapeId, parts, relContainedId, relFillsId, opening };
 }

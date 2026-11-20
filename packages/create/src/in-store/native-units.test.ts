@@ -118,7 +118,7 @@ describe('in-store builders emit native length units (mm model)', () => {
 
   it('door: OverallHeight/OverallWidth attributes and solid in mm', () => {
     const { editor, byId } = harness();
-    const r = addDoorToStore(editor, MM_ANCHOR, { Position: [1, 0, 0], Width: 0.9, Height: 2.1 });
+    const r = addDoorToStore(editor, MM_ANCHOR, { Position: [1, 0, 0], Width: 0.9, Height: 2.1, Detail: 'box' });
     const ents = byId();
     const door = ents.get(r.doorId);
     expect(door?.attributes[8]).toBeCloseTo(2100, 6); // OverallHeight
@@ -127,14 +127,16 @@ describe('in-store builders emit native length units (mm model)', () => {
     expect(ents.get(r.profileId)?.attributes[4]).toBeCloseTo(50, 6); // default 0.05 m frame
   });
 
-  it('window: OverallHeight/OverallWidth attributes and solid in mm', () => {
+  it('window: OverallHeight/OverallWidth attributes and lining in mm', () => {
     const { editor, byId } = harness();
     const r = addWindowToStore(editor, MM_ANCHOR, { Position: [1, 0, 1], Width: 1.2, Height: 1.4 });
     const ents = byId();
     const win = ents.get(r.windowId);
     expect(win?.attributes[8]).toBeCloseTo(1400, 6);
     expect(win?.attributes[9]).toBeCloseTo(1200, 6);
-    expect(ents.get(r.solidId)?.attributes[3]).toBeCloseTo(1400, 6);
+    expect(ents.get(r.profileId)?.attributes[3]).toBeCloseTo(1200, 6);
+    expect(ents.get(r.profileId)?.attributes[4]).toBeCloseTo(1400, 6);
+    expect(ents.get(r.solidId)?.attributes[3]).toBeCloseTo(50, 6);
   });
 
   it('roof (rectangle): profile dims and thickness in mm', () => {

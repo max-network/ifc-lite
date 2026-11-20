@@ -67,6 +67,17 @@ export {
   type HostedFillBuildResult,
 } from './hosted-fill.js';
 export { hostPlanFrame, readHostedFill, type HostPlanFrame, type HostedFillRead } from './hosted-fill-read.js';
+export {
+  emitFillingBody,
+  type FillingBody,
+  type FillingBodySpec,
+  type FillingColorRole,
+  type FillingDetail,
+  type FillingDetailParams,
+  type FillingPart,
+  type FillingPartRole,
+} from './filling-body.js';
+export { doorLayout, windowLayout, DEFAULT_LINING_THICKNESS, type DoorLayout, type FillingRect, type WindowLayout } from './filling-layout.js';
 export { addHostedElementInStore, readHostOpeningExtents, type HostedElementInStoreSpec, type HostedElementInStoreResult, type HostedOpeningExtent } from './hosted-element.js';
 export { editHostedElementInStore, readHostedElementSize, type HostedElementEdit, type HostedElementSize } from './hosted-element-edit.js';
 export {

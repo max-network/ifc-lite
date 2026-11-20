@@ -92,6 +92,29 @@ export function emitRectangleProfile(
   ]).expressId;
 }
 
+/** Emit a centred rectangular ring (`IfcRectangleHollowProfileDef`), `wall` wide on every side. */
+export function emitRectangleRingProfile(
+  editor: StoreEditor,
+  width: number,
+  depth: number,
+  wall: number,
+  centerX = 0,
+  centerY = 0,
+): number {
+  const originPt = editor.addEntity('IfcCartesianPoint', [[centerX, centerY]]).expressId;
+  const pos = editor.addEntity('IfcAxis2Placement2D', [`#${originPt}`, null]).expressId;
+  return editor.addEntity('IfcRectangleHollowProfileDef', [
+    '.AREA.',
+    null,
+    `#${pos}`,
+    width,
+    depth,
+    wall,
+    null,
+    null,
+  ]).expressId;
+}
+
 /**
  * Emit an arbitrary closed profile from a 2D polyline. Auto-closes if
  * the input doesn't already terminate at the start point.
@@ -136,19 +159,20 @@ export function emitExtrudedSolid(editor: StoreEditor, profileId: number, depth:
 
 /**
  * Emit a "Body" IfcShapeRepresentation + IfcProductDefinitionShape
- * pair from a single solid. Returns both ids so callers can record
+ * pair from one solid or several. Returns both ids so callers can record
  * them in their build result for downstream tooling.
  */
 export function emitBodyRepresentation(
   editor: StoreEditor,
   bodyContextId: number,
-  solidId: number,
+  solidId: number | readonly number[],
 ): { shapeRepId: number; productShapeId: number } {
+  const solids = typeof solidId === 'number' ? [solidId] : solidId;
   const shapeRepId = editor.addEntity('IfcShapeRepresentation', [
     `#${bodyContextId}`,
     'Body',
     'SweptSolid',
-    [`#${solidId}`],
+    solids.map((id) => `#${id}`),
   ]).expressId;
   const productShapeId = editor.addEntity('IfcProductDefinitionShape', [
     null,
@@ -237,6 +261,9 @@ export interface SurfaceStyleColor {
   /** 1 is opaque. Written as `IfcSurfaceStyleShading.Transparency = 1 - alpha`. */
   alpha?: number;
 }
+
+/** A faint blue-grey float glass, shared by curtain wall panels and window panes. */
+export const GLAZING_COLOR: Readonly<SurfaceStyleColor> = { red: 0.62, green: 0.76, blue: 0.84, alpha: 0.28 };
 
 /** Guards a caller's 0..255 or out-of-range channel from reaching STEP. */
 function clamp01(v: number): number {
