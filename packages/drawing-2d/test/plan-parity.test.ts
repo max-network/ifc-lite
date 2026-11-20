@@ -150,6 +150,7 @@ describe.skipIf(!wasmAvailable)('floor plan parity on real models', () => {
       expect(row.chainsClosing, where).toBe(row.openingChains);
       expect(row.undimensionedOpenings, where).toEqual([]);
       expect(row.spacesCrossedBothWays, where).toBe(row.spacesLabelled);
+      expect(row.interiorObstacleCrossings, where).toBe(0);
     }
     const ground = dimensionRows.find((r) => r.fixture === 'AC20-FZK-Haus' && r.storey === 'Erdgeschoss');
     expect(ground?.exteriorOpenings).toBe(10);

@@ -150,6 +150,23 @@ describe('buildPlanDimensions: interior chains', () => {
     const horizontal = plan(walls, [], { kinds: ['interior'] }).filter((c) => Math.abs(c.direction.x) > 0.5);
     expect(horizontal.map(lengths)).toEqual([[0.3, 4.6, 0.2, 4.6, 0.3]]);
   });
+
+  it('moves a room chain off a stair to the other side of the label', () => {
+    const stair = rect(5, 2.5, 6, 3.6, 0, 'IfcStair');
+    const levels = (options: PlanDimensionOptions) => {
+      const chains = plan([...house(), stair], [label(6.5, 4, 'Living')], { kinds: ['interior'], ...options });
+      const across = chains.find((c) => Math.abs(c.direction.x) > 0.5);
+      const beside = chains.find((c) => Math.abs(c.direction.y) > 0.5);
+      return { across: across?.segments[0].a.y, beside: beside?.segments[0].a.x, spans: [lengths(across), lengths(beside)] };
+    };
+    const clear = levels({});
+    expect(clear.across).toBeCloseTo(4.6);
+    expect(clear.beside).toBeCloseTo(7.55);
+    expect(clear.spans).toEqual([[9.4], [7.4]]);
+    const ignored = levels({ obstacle: () => false });
+    expect(ignored.across).toBeCloseTo(3.4);
+    expect(ignored.beside).toBeCloseTo(5.45);
+  });
 });
 
 describe('buildPlanDimensions: text placement', () => {

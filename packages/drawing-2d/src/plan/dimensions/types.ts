@@ -42,6 +42,8 @@ export interface PlanDimensionOptions {
   firstOffsetMm?: number;
   /** Paper distance between exterior chain tiers, mm. Default 8. */
   tierSpacingMm?: number;
+  /** Element types interior chains keep clear of. Default stairs, ramps, railings, furniture and fixtures. */
+  obstacle?: (ifcType: string) => boolean;
   /** Thickest wall expected, metres: a gap whose jambs are no deeper is an opening, else a recess. Default 1. */
   maxWallThickness?: number;
 }

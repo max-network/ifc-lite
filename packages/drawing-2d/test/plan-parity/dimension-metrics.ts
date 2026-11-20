@@ -5,7 +5,7 @@
 /** Dimension-chain metrics of one storey plan, measured from the drawing's own geometry. */
 
 import type { Drawing2D, Point2D } from '../../src/types.js';
-import { isPlanFabric, linearDimensionLength, type PlanDimensionChain } from '../../src/index.js';
+import { isPlanFabric, isPlanObstacle, linearDimensionLength, type PlanDimensionChain } from '../../src/index.js';
 
 export interface DimensionMetrics {
   sidesDimensioned: number;
@@ -17,6 +17,7 @@ export interface DimensionMetrics {
   undimensionedOpenings: string[];
   spacesLabelled: number;
   spacesCrossedBothWays: number;
+  interiorObstacleCrossings: number;
 }
 
 const JAMB_TOLERANCE = 0.05;
@@ -38,6 +39,25 @@ function rayHits(segments: readonly Segment[], from: Point2D, dir: Point2D): boo
     if (t > 0.05 && u >= 0 && u <= 1) return true;
   }
   return false;
+}
+
+function crosses([p, q]: Segment, [r, s]: Segment): boolean {
+  const d1 = { x: q.x - p.x, y: q.y - p.y };
+  const d2 = { x: s.x - r.x, y: s.y - r.y };
+  const denom = d1.x * d2.y - d1.y * d2.x;
+  if (Math.abs(denom) < 1e-12) return false;
+  const w = { x: r.x - p.x, y: r.y - p.y };
+  const t = (w.x * d2.y - w.y * d2.x) / denom;
+  const u = (w.x * d1.y - w.y * d1.x) / denom;
+  return t >= 0 && t <= 1 && u >= 0 && u <= 1;
+}
+
+function dimensionLine(chain: PlanDimensionChain, segment: PlanDimensionChain['segments'][number]): Segment {
+  const n = { x: -chain.direction.y, y: chain.direction.x };
+  const mid = { x: (segment.a.x + segment.b.x) / 2, y: (segment.a.y + segment.b.y) / 2 };
+  const c = segment.offset + dot(mid, n);
+  const onto = (p: Point2D): Point2D => ({ x: p.x + n.x * (c - dot(p, n)), y: p.y + n.y * (c - dot(p, n)) });
+  return [onto(segment.a), onto(segment.b)];
 }
 
 function stations(chain: PlanDimensionChain): number[] {
@@ -118,6 +138,12 @@ export function measureDimensions(drawing: Drawing2D, storeyElements: ReadonlySe
     });
   }).length;
 
+  const obstacles: Segment[] = [
+    ...drawing.lines.filter((l) => l.visibility === 'visible' && isPlanObstacle(l.ifcType)).map((l): Segment => [l.line.start, l.line.end]),
+    ...drawing.cutPolygons.filter((p) => isPlanObstacle(p.ifcType)).flatMap((p) => ringSegments(p.polygon.outer)),
+  ];
+  const interiorObstacleCrossings = interior.flatMap((chain) => chain.segments.map((s) => dimensionLine(chain, s))).filter((line) => obstacles.some((o) => crosses(line, o))).length;
+
   return {
     sidesDimensioned: overall.size,
     chainsClosing,
@@ -128,5 +154,6 @@ export function measureDimensions(drawing: Drawing2D, storeyElements: ReadonlySe
     undimensionedOpenings: missing,
     spacesLabelled: spaceLabels.length,
     spacesCrossedBothWays: crossed,
+    interiorObstacleCrossings,
   };
 }
