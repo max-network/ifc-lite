@@ -57,6 +57,23 @@ export type { StationEquationParams } from './ifc-creator-alignment-referents.js
 export type * from './landxml/source-types.js';
 export type * from './landxml/result-types.js';
 
+// Streets, driveways and paths: one corridor geometry for IFC, plans, views and the terrain fit.
+export {
+  buildCorridor, corridorProblems, crossFallRise,
+  type Corridor, type CorridorDefinition, type CorridorKerb, type CorridorMesh, type CorridorPart, type CrossFallSide,
+  type SectionColumn, type CorridorTriangle, type CorridorVertex,
+} from './corridor/corridor.js';
+export { horizontalAt, offsetFrom, type HorizontalFrame, type PlanXY } from './corridor/horizontal.js';
+export { profileAt, type CorridorPvi, type ProfileCurve, type ProfileGrade } from './corridor/profile.js';
+export { CorridorRefusal, type CorridorProblem, type CorridorProblemCode } from './corridor/problems.js';
+export { DEFAULT_CORRIDOR_TOLERANCE } from './corridor/sampling.js';
+export { fitTinToOutlines, type Tin, type TinFitOptions, type TinPoint, type TinTriangle } from './corridor/tin-fit.js';
+export {
+  addCorridorInStore, readCorridorInStore, CORRIDOR_PSET,
+  type CorridorAnchor, type CorridorParams, type CorridorResult, type PavementType,
+} from './in-store/corridor.js';
+export { removeAlignmentInStore } from './in-store/alignment-remove.js';
+
 // In-store authoring API, kept separate from create-from-scratch types.
 export * from './in-store/index.js';
 
