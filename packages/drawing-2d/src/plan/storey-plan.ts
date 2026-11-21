@@ -9,12 +9,11 @@
  */
 
 import type { MeshData } from '@ifc-lite/geometry';
-import type { RenderFrameInfo } from '@ifc-lite/geometry/world-frame';
 import type { Drawing2D, Line2D, ProfileEntry } from '../types.js';
 import { boundsExtendLine, boundsExtendPoint } from '../math.js';
 import { Drawing2DGenerator, createSectionConfig, type GeneratorOptions } from '../drawing-generator.js';
 import { PLAN_ELEMENT_FILTER, selectDrawableMeshes, type DrawingElementFilter } from './element-filter.js';
-import { DEFAULT_PLAN_CUT_HEIGHT, storeyCutElevation } from './storey-frame.js';
+import { DEFAULT_PLAN_CUT_HEIGHT, storeyCutElevation, type StoreyCutFrame } from './storey-frame.js';
 import { buildOpeningSymbols, isOpeningFillingType } from './opening-symbols.js';
 import { buildSpaceAnnotations } from './space-annotations.js';
 import type { PlanLabel, PlanOpeningInfo, PlanSymbol } from './plan-types.js';
@@ -22,14 +21,14 @@ import { buildPlanDimensions, planDimensionGraphics } from './dimensions/chains.
 import type { PlanDimensionOptions } from './dimensions/types.js';
 
 export interface StoreyPlanOptions {
-  /** Storey floor level, IFC world Z in metres (e.g. `SpatialHierarchy.storeyElevations`). */
+  /** `IfcBuildingStorey.Elevation` in metres, relative to the site placement (e.g. `SpatialHierarchy.storeyElevations`). */
   storeyElevation: number;
   /** Cut height above the floor, metres. Default 1.2. */
   cutHeight?: number;
   /** Floor-to-floor height, metres: bounds the dashed overhead band. Without it nothing overhead is drawn. */
   storeyHeight?: number;
   /** The meshes' render frame (`GeometryResult.coordinateInfo`), so the cut lands in model coordinates. */
-  frame?: RenderFrameInfo | null;
+  frame?: StoreyCutFrame | null;
   /** Drawing scale denominator. Default 100. */
   scale?: number;
   /** Which meshes are drawn. Default {@link PLAN_ELEMENT_FILTER}. */

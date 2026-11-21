@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 export { generateStoreyPlan, type StoreyPlanOptions } from './storey-plan.js';
-export { storeyCutElevation, DEFAULT_PLAN_CUT_HEIGHT } from './storey-frame.js';
+export { storeyCutElevation, DEFAULT_PLAN_CUT_HEIGHT, type StoreyCutFrame } from './storey-frame.js';
 export {
   selectDrawableMeshes,
   PLAN_ELEMENT_FILTER,
