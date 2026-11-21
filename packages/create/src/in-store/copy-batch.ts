@@ -197,9 +197,10 @@ export interface StoreyCopies {
  */
 export function copyToStoreysInStore(
   store: IfcDataStore, editor: StoreEditor, ids: readonly number[], storeyIds: readonly number[],
+  options: CopyBatchOptions = {},
 ): readonly StoreyCopies[] {
   if (new Set(storeyIds).size !== storeyIds.length) throw new Error('Each storey can be a copy target only once');
-  const results = copyBatchInStore(store, editor, ids, storeyIds.map((targetStoreyId) => ({ targetStoreyId })));
+  const results = copyBatchInStore(store, editor, ids, storeyIds.map((targetStoreyId) => ({ targetStoreyId })), options);
   // Transform-major: each storey's copies are one contiguous run.
   const per = results.length / Math.max(1, storeyIds.length);
   const selected = copiesOfSelection(ids, results, storeyIds.length);

@@ -4628,6 +4628,7 @@
     "ArbitraryProfile: interface",
     "AttachedHeightChange: interface",
     "AuthoringAnchor: type",
+    "AuthoringGuidOptions: interface",
     "AutoSpaceDetectOptions: interface",
     "AutoSpaceSegment: interface",
     "AutoSpaceVec2: type",
