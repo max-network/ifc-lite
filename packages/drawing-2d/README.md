@@ -11,10 +11,14 @@ npm install @ifc-lite/drawing-2d
 ## Floor plan
 
 ```typescript
-import { generateFloorPlan, exportToSVG, PAPER_SIZES, COMMON_SCALES } from '@ifc-lite/drawing-2d';
+import { generateFloorPlan, storeyCutElevation, exportToSVG, PAPER_SIZES, COMMON_SCALES } from '@ifc-lite/drawing-2d';
 
-// Cut at 1.2 m above floor level (standard architectural plan height)
-const drawing = await generateFloorPlan(meshes, 1.2, {
+// Cut 1.2 m above a storey floor (standard architectural plan height). The
+// meshes sit in a shifted render frame; storeyCutElevation moves the storey's
+// Elevation into it.
+const elevation = store.spatialHierarchy?.storeyElevations.get(storeyId) ?? 0;
+const cut = storeyCutElevation(elevation, 1.2, geometryResult.coordinateInfo);
+const drawing = await generateFloorPlan(geometryResult.meshes, cut, {
   includeHiddenLines: true,
   includeProjection: true,
 });
