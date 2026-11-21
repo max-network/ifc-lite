@@ -242,12 +242,7 @@ export { GPUSectionCutter, isGPUComputeAvailable } from './gpu-section-cutter.js
 // HIGH-LEVEL GENERATOR
 // ═══════════════════════════════════════════════════════════════════════════
 
-export {
-  Drawing2DGenerator,
-  createSectionConfig,
-  generateFloorPlan,
-  generateSection,
-} from './drawing-generator.js';
+export { Drawing2DGenerator, createSectionConfig, generateFloorPlan, generateSection } from './drawing-generator.js';
 export type { GeneratorOptions, GeneratorProgress } from './drawing-generator.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -352,6 +347,7 @@ export {
   generateWindowSymbol,
   generateStairArrow,
 } from './symbols/index.js';
+export type { PlanSymbol, PlanOpeningInfo, PlanSymbolOptions } from './symbols/opening-symbols.js';
 
 export type {
   // Symbol types
