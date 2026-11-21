@@ -30,6 +30,9 @@ import {
 } from './_emit-helpers.js';
 import { parseMaterialColor } from './material.js';
 import { DEFAULT_LINING_THICKNESS, doorLayout, windowLayout, type FillingRect } from './filling-layout.js';
+import { archedParts } from './arch/arched-filling.js';
+import { headRise, type OpeningHead } from './arch/opening-head.js';
+import { emitPathProfile, scalePath, type ProfilePath } from './arch/profile-path.js';
 
 export type FillingDetail = 'detailed' | 'box';
 export type FillingPartRole = 'lining' | 'mullion' | 'glazing' | 'leaf' | 'handle';
@@ -43,6 +46,7 @@ export interface FillingDetailParams {
   LiningThickness?: number;
   /** Surface colour per part: a hex string (`#rrggbb`, `#rrggbbaa`) or channels in 0..1. Mullions take the lining's. */
   PartColors?: Partial<Record<FillingColorRole, SurfaceStyleColor | string>>;
+  Head?: OpeningHead;
 }
 
 export interface FillingPart {
@@ -80,17 +84,18 @@ const DEFAULT_COLORS: Readonly<Record<FillingColorRole, SurfaceStyleColor>> = {
   leaf: { red: 0.78, green: 0.64, blue: 0.47 },
   handle: { red: 0.6, green: 0.61, blue: 0.63 },
 };
-const GLAZING_THICKNESS = 0.024;
-const LEAF_THICKNESS = 0.04;
-const HANDLE_PROJECTION = 0.05;
+export const GLAZING_THICKNESS = 0.024;
+export const LEAF_THICKNESS = 0.04;
+export const HANDLE_PROJECTION = 0.05;
 const snap = (x: number) => Math.round(x * 1e9) / 1e9;
 
-type Shape =
+export type Shape =
   | { kind: 'rect'; rect: FillingRect }
   | { kind: 'ring'; width: number; height: number; wall: number }
-  | { kind: 'outline'; points: Array<[number, number]> };
+  | { kind: 'outline'; points: Array<[number, number]> }
+  | { kind: 'path'; outer: ProfilePath; voids: readonly ProfilePath[] };
 
-interface PartSpec {
+export interface PartSpec {
   role: FillingPartRole;
   shape: Shape;
   depth: number;
@@ -124,16 +129,19 @@ export function emitFillingBody(
   op: string,
 ): FillingBody {
   const n = (metres: number) => snap(toNativeLength(anchor, metres));
-  if (spec.Detail === 'box') {
+  const rise = spec.Head ? headRise(spec.Head, spec.Width, spec.Height, op) : null;
+  if (spec.Detail === 'box' && rise === null) {
     const profileId = emitRectangleProfile(editor, n(spec.Width), n(spec.FrameThickness));
     const solidId = emitExtrudedSolid(editor, profileId, n(spec.Height));
     return { profileId, solidId, ...emitBodyRepresentation(editor, anchor.bodyContextId, solidId), parts: [] };
   }
-  if (spec.Detail !== undefined && spec.Detail !== 'detailed') throw new Error(`${op}: Detail must be 'detailed' or 'box'`);
+  if (spec.Detail !== undefined && spec.Detail !== 'detailed' && spec.Detail !== 'box') throw new Error(`${op}: Detail must be 'detailed' or 'box'`);
   const lining = spec.LiningThickness ?? DEFAULT_LINING_THICKNESS;
   assertPositiveFinite([lining], `${op}: LiningThickness must be positive`);
   const colors = resolveColors(spec.PartColors, op);
-  const parts = spec.kind === 'window' ? windowParts(spec, lining, spec.FrameThickness) : doorParts(spec, lining, spec.FrameThickness);
+  const parts = rise !== null
+    ? archedParts(spec, lining, spec.FrameThickness, rise)
+    : spec.kind === 'window' ? windowParts(spec, lining, spec.FrameThickness) : doorParts(spec, lining, spec.FrameThickness);
 
   const planeAxis = editor.addEntity('IfcDirection', [[0, -1, 0]]).expressId;
   const planeRef = editor.addEntity('IfcDirection', [[1, 0, 0]]).expressId;
@@ -160,7 +168,7 @@ export function emitFillingBody(
   };
 
   const written: FillingPart[] = parts.map((part) => {
-    const profileId = emitShape(editor, part.shape, n);
+    const profileId = emitShape(editor, anchor.schema, part.shape, n);
     const depth = n(part.depth);
     const solidId = editor.addEntity('IfcExtrudedAreaSolid', [`#${profileId}`, `#${position(depth)}`, `#${extrusion}`, depth]).expressId;
     const colorRole: FillingColorRole = part.role === 'mullion' ? 'lining' : part.role;
@@ -171,7 +179,8 @@ export function emitFillingBody(
   return { profileId, solidId, ...emitBodyRepresentation(editor, anchor.bodyContextId, written.map((p) => p.solidId)), parts: written };
 }
 
-function emitShape(editor: StoreEditor, shape: Shape, n: (metres: number) => number): number {
+function emitShape(editor: StoreEditor, schema: SpatialAnchor['schema'], shape: Shape, n: (metres: number) => number): number {
+  if (shape.kind === 'path') return emitPathProfile(editor, schema, scalePath(shape.outer, n), shape.voids.map((path) => scalePath(path, n)));
   if (shape.kind === 'ring') return emitRectangleRingProfile(editor, n(shape.width), n(shape.height), n(shape.wall), 0, n(shape.height / 2));
   if (shape.kind === 'outline') return emitPolygonProfile(editor, shape.points.map(([x, z]) => [n(x), n(z)] as const));
   const { x0, z0, x1, z1 } = shape.rect;

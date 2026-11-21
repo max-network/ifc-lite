@@ -108,6 +108,7 @@ function addHostedFill(
     Width: params.Width,
     Height: params.Height,
     CutDepth: params.CutDepth,
+    Head: params.Head,
     Name: `${params.Name ?? label} Opening`,
   });
 

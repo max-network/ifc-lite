@@ -22,6 +22,8 @@ import { refId } from './host-geometry-frame.js';
 const OWNED_SLOTS: Readonly<Record<string, readonly number[]>> = {
   IFCPRODUCTDEFINITIONSHAPE: [2],
   IFCSHAPEREPRESENTATION: [3],
+  IFCPOLYGONALFACESET: [0, 2],
+  IFCTRIANGULATEDFACESET: [0],
   IFCMAPPEDITEM: [0, 1],
   IFCREPRESENTATIONMAP: [0, 1],
   IFCSTYLEDITEM: [1],

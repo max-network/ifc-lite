@@ -16,6 +16,8 @@ import { scaleHostedShape } from './hosted-shape-edit.js';
 import { moveHostedOpeningPlacement } from './hosted-placement-edit.js';
 import { placementInAncestor, refId, transformBounds, type Frame3, type Vec3 } from './host-geometry-frame.js';
 import { safeLengthUnitScale } from './length-unit-scale.js';
+import { rebuildHostedHead } from './arch/hosted-head-edit.js';
+import { readOpeningHead, type OpeningHead } from './arch/opening-head.js';
 
 export interface HostedElementSize {
   /** Effective IfcDoor / IfcWindow dimension, metres. Geometry supplies the
@@ -31,6 +33,7 @@ export interface HostedElementEdit {
   readonly Offset?: number;
   /** Height of the opening placement origin in the host frame, metres. */
   readonly Sill?: number;
+  readonly Head?: OpeningHead | null;
 }
 
 interface HostedGeometry {
@@ -88,6 +91,7 @@ export function readHostedElementSize(store: IfcDataStore, id: number, view?: Mu
 export function editHostedElementInStore(store: IfcDataStore, editor: StoreEditor, id: number, patch: HostedElementEdit): HostedFillRead {
   if (!['IFC2X3', 'IFC4', 'IFC4X3'].includes(store.schemaVersion ?? 'IFC4')) throw new Error('Hosted edits support IFC2X3, IFC4 and IFC4X3 only');
   for (const [name, value] of Object.entries(patch)) {
+    if (name === 'Head') continue;
     if (value !== undefined && (!Number.isFinite(value) || ((name === 'OverallWidth' || name === 'OverallHeight') && value <= 0))) {
       throw new Error(`${name} must be ${name.startsWith('Overall') ? 'positive and ' : ''}finite`);
     }
@@ -111,7 +115,11 @@ export function editHostedElementInStore(store: IfcDataStore, editor: StoreEdito
       max: [anchor[0] + (cut.max[0] - anchor[0]) * widthScale + dx, cut.max[1], cut.min[2] + (cut.max[2] - cut.min[2]) * heightScale + dz],
     };
     validateWallOpeningBounds(store, view, host, proposed, read.openingId);
-    if (widthScale !== 1 || heightScale !== 1) {
+    const arched = readOpeningHead(store, read.openingId, view);
+    if (patch.Head !== undefined || arched) {
+      const extent = (axis: 0 | 2) => fromNativeLength(host, proposed.max[axis] - proposed.min[axis]);
+      rebuildHostedHead(store, draft, host, read, { width: extent(0), height: extent(2), head: patch.Head === undefined ? arched?.head ?? null : patch.Head });
+    } else if (widthScale !== 1 || heightScale !== 1) {
       scaleHostedShape(store, reader, draft, read.openingId, current.openingFrame, anchor, widthScale, heightScale);
       if (read.fillingId !== null && current.fillingFrame) {
         scaleHostedShape(store, reader, draft, read.fillingId, current.fillingFrame, anchor, widthScale, heightScale);

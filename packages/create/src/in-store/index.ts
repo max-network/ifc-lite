@@ -132,6 +132,11 @@ export {
   type FootprintRoofPlan, type RoofEdgeBreak, type RoofPlane, type RoofShapeType,
 } from './roof-footprint-plan.js';
 export { readRoofClippedWallTop, type WallTopPoint } from './wall-roof-clip.js';
+export { addVaultToStore, editVaultInStore, readVaultInStore, type VaultEdit, type VaultInStore, type VaultInStoreParams } from './vault/vault.js';
+export { VAULT_PSET, type VaultShape, type VaultSpanAxis } from './vault/vault-definition.js';
+export { vaultPlanLines, type PlanSegment, type VaultPlanFrame, type VaultPlanLines } from './vault/vault-plan.js';
+export { readOpeningHead, type OpeningHead, type ReadOpeningHead } from './arch/opening-head.js';
+export type { ArchKind } from './arch/arch-shape.js';
 export { addPlateToStore, type PlateInStoreParams, type PlateRectangleParams, type PlatePolygonParams, type PlateBuildResult } from './plate.js';
 export { addMemberToStore, type MemberInStoreParams, type ProfiledMemberInStoreParams, type MemberBuildResult } from './member.js';
 export {

@@ -32,6 +32,9 @@ import {
   ifcElementHeader,
   ownerHistoryRef,
 } from './_emit-helpers.js';
+import { archedOpeningPath } from './arch/arched-outline.js';
+import { headRise, type OpeningHead } from './arch/opening-head.js';
+import { emitPathProfile } from './arch/profile-path.js';
 
 /** Metres the default cut overshoots each face of the host, so no skin survives. */
 const CUT_CLEARANCE_M = 0.05;
@@ -55,6 +58,7 @@ export interface WallOpeningInStoreParams extends OpeningCommonParams {
   Sill?: number;
   Width: number;
   Height: number;
+  Head?: OpeningHead;
 }
 
 /** Opening in a slab, in the slab's own placement frame. */
@@ -165,7 +169,9 @@ function wallOpeningGeometry(editor: StoreEditor, host: HostAnchor, params: Open
     [0, -1, 0],
     [1, 0, 0],
   );
-  const profileId = emitRectangleProfile(editor, width, height, 0, height / 2);
+  const profileId = params.Head
+    ? emitPathProfile(editor, host.schema, archedOpeningPath({ width, height, rise: toNativeLength(host, headRise(params.Head, params.Width, params.Height, op)) }))
+    : emitRectangleProfile(editor, width, height, 0, height / 2);
   const solidId = emitExtrudedSolid(editor, profileId, cutDepth);
   return { placementId, profileId, solidId, cutDepth };
 }
