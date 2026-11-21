@@ -633,6 +633,24 @@ if (size) {
 
 Size edits apply an affine mapping to the selected occurrence and its opening, holding the existing cut's centre and bottom while preserving its thickness. Repeated size edits combine compatible existing scales so mapping depth does not grow with every commit. Source/type geometry, styles, metadata, relationships and other occurrences remain unchanged. Fresh placements prevent a move from altering shared source points. Size edits require a readable filling Body; position-only edits also support fillings whose optional Body is absent or cannot be measured. Both require readable opening bounds and valid placements, and refusals leave no writes. In the viewer, the Dimensions and Hosting fields and plan slide handle call this core; each successful edit is one undo step and re-meshes the filling and voided host through WASM.
 
+#### Vaults and arched heads
+
+Historic buildings and existing-state surveys need vaulted ceilings and arched openings. `addVaultToStore(editor, anchor, params)` writes an `IfcSlab` with `PredefinedType` `USERDEFINED` and `ObjectType` `VAULT` over a rectangle (`Origin`, `XDirection`, `Width`, `Depth`, storey-local metres), from `Springing` to the `Crown` of its underside above the storey, `Thickness` on top. Every arch comes from one formula: a span `s` and rise `f` give the radius `(s² / 4 + f²) / 2f`, its centre `f - r` above the springing on the midline; `f = s / 2` is round, a larger rise is pointed, built from two equal circles through the crown. A `barrel` vault is one `IfcExtrudedAreaSolid` of its arch band, the intrados on `r` and the extrados on the concentric `r + t`, bounded by an `IfcIndexedPolyCurve` of `IfcArcIndex` arcs (a polyline in IFC2X3); `SpanAxis` (`X` or `Y`, default across the shorter side) is the side the arch spans. A `cross` (groin) vault is a closed `IfcPolygonalFaceSet` (an `IfcFacetedBrep` in IFC2X3) of two perpendicular circular barrels with the same crown, each cell the barrel that rises above the other, meeting along their exact intersection curves, which are ellipses in the diagonal planes over a square bay. Arcs are split, and faceted, so that no chord sags more than 5 mm off its circle (`r(1 - cos(θ/2n))`). The definition is recorded in `IfcLite_Vault`; `readVaultInStore(dataStore, id, storeyId, view)` reads it back with its placement, `editVaultInStore` rebuilds the body in place, and `vaultPlanLines(vault)` gives the plan outline, crown lines and groins from the same geometry.
+
+Wall openings, doors and windows take `Head: { Shape: 'round' }` or `{ Shape: 'segmental', Rise }`; `Height` reaches the crown. The opening's profile, the lining, panes, mullions and leaves follow the arch, a rise above half the width or the height is refused, and `readOpeningHead(dataStore, openingId, view)` reads the head back from the profile. `editHostedElementInStore` keeps a head through a resize (a round head stays round) and changes it with `Head`; `Head: null` makes the opening rectangular again.
+
+```typescript
+import { addHostedElementInStore, addVaultToStore, resolveSpatialAnchor } from '@ifc-lite/create';
+
+const anchor = resolveSpatialAnchor(dataStore, storeyId, view);
+const vault = addVaultToStore(editor, anchor, {
+  Shape: 'barrel', Origin: [0.12, 0.12], Width: 6, Depth: 4, Springing: 1.8, Crown: 2.6, Thickness: 0.25,
+});
+const arched = addHostedElementInStore(dataStore, editor, wallExpressId, {
+  kind: 'window', params: { Offset: 2.6, Sill: 0.6, Width: 1.2, Height: 2, Head: { Shape: 'round' } },
+});
+```
+
 `reanchorHostedOpeningsInStore(dataStore, editor, hostExpressId, shift)` preserves every hosted opening when a validated host edit translates its origin. `shift` is the origin displacement in the host frame, in native file units. The caller validates the final host body before resizing it. The operation gives each opening and filling fresh placement records, leaving shared source points and placements untouched. It reanchors the full batch atomically, without testing one cut against another cut's temporary position during the move. Unreadable cuts or placements refuse without writes. Trim/Extend uses this operation inside its existing one-step undo transaction.
 
 `reassignHostedOpeningsInStore(dataStore, editor, sourceHostExpressId, moves)` applies a validated host split plan to a batch of `{ openingId, hostId, location }` entries. Each native-unit `location` is relative to its target host. The operation preserves opening/filling/relationship identities, changes the void relation's host when needed, and gives each edited occurrence fresh placements. Duplicate entries, ambiguous source void relationships and unreadable placements refuse atomically. Wall split, multisplit and slab split use this same placement writer and include all new placement records in one undo step.
