@@ -14,6 +14,7 @@
  */
 
 import type { MeshData } from '@ifc-lite/geometry';
+import { selectModelMeshes } from '@ifc-lite/geometry/geometry-class';
 import type {
   SectionConfig,
   SectionAxis,
@@ -138,7 +139,8 @@ export class Drawing2DGenerator {
   }
 
   /**
-   * Generate a complete 2D drawing from meshes
+   * Generate a complete 2D drawing from meshes. Type-library geometry
+   * (`geometryClass` 1/2) is left out, as in the viewer's Model view.
    */
   async generate(
     meshes: MeshData[],
@@ -148,6 +150,7 @@ export class Drawing2DGenerator {
   ): Promise<Drawing2D> {
     const opts = { ...DEFAULT_OPTIONS, ...options };
     const startTime = performance.now();
+    meshes = selectModelMeshes(meshes);
 
     const report = (stage: string, progress: number) => {
       opts.onProgress?.(stage, progress);
@@ -168,11 +171,7 @@ export class Drawing2DGenerator {
       // UX targets.
       cutSegments = await this.gpuCutter.cutMeshes(meshes, config.plane);
     } else {
-      // CPU path. Always rebuild the cutter so a switch from cardinal
-      // to custom-plane (or between two different custom planes) takes
-      // effect immediately — caching the instance keyed only on
-      // existence, as the previous code did, would silently apply the
-      // first config used for the lifetime of the generator.
+      // CPU path. Rebuilt per call so a change of plane always takes effect.
       this.cpuCutter = new SectionCutter(config.plane);
       const cutResult = this.cpuCutter.cutMeshes(meshes);
       cutSegments = cutResult.segments;
