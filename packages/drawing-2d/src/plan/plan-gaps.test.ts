@@ -165,6 +165,11 @@ describe('goal 3: the plan cut is storey-relative in model coordinates', () => {
     expect(storeyCutElevation(0.5, 1.2, revitFrame)).toBeCloseTo(1.2, 9);
   });
 
+  it('adds the building placement too, since IfcBuildingStorey.Elevation is relative to the building', () => {
+    expect(storeyCutElevation(0, 1.2, { siteOrigin: { x: 0, y: 0, z: 0 }, buildingOrigin: { z: 3 } })).toBeCloseTo(4.2, 9);
+    expect(storeyCutElevation(0.5, 1.2, { siteOrigin: { x: 0, y: 0, z: 14.23 }, buildingOrigin: { z: 3 }, wasmRtcOffset: { x: 0, y: 0, z: 14.73 } })).toBeCloseTo(4.2, 9);
+  });
+
   it('cuts 1.2 m above the storey floor of a re-centred model, not 1.2 m above the render origin', async () => {
     const frame = { wasmRtcOffset: { x: 0, y: 0, z: 101.69 } };
     const groundWall = box(1, 'IfcWall', [0, -1.69, 0], [4, 1.01, 0.3]);

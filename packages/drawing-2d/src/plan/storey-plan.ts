@@ -21,7 +21,7 @@ import { buildPlanDimensions, planDimensionGraphics } from './dimensions/chains.
 import type { PlanDimensionOptions } from './dimensions/types.js';
 
 export interface StoreyPlanOptions {
-  /** `IfcBuildingStorey.Elevation` in metres, relative to the site placement (e.g. `SpatialHierarchy.storeyElevations`). */
+  /** `IfcBuildingStorey.Elevation` in metres, relative to the building placement (e.g. `SpatialHierarchy.storeyElevations`); give the building's Z as `frame.buildingOrigin`. */
   storeyElevation: number;
   /** Cut height above the floor, metres. Default 1.2. */
   cutHeight?: number;
