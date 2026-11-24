@@ -9,7 +9,7 @@ import { addWallToStore } from './wall.js';
 import { setTopConstraintInStore } from './storey/storey-top-constraint.js';
 import { readWallJoinTarget } from './wall-join-read.js';
 import { readRoofClippedWallTop } from './wall-roof-clip.js';
-import { readFootprintRoofInStore } from './roof-footprint.js';
+import { editFootprintRoofInStore, readFootprintRoofInStore } from './roof-footprint.js';
 
 const SLOPE = Math.PI / 6;
 
@@ -65,5 +65,23 @@ describe('a wall cut to a roof underside', () => {
     const roofId = addRoofToStore(s.editor, s.anchor, { Position: [0, 0, 4], Width: 10, Depth: 8, Thickness: .25, EdgeSlopes: [SLOPE, 0, SLOPE, 0], Overhang: .5 }).roofId;
     const wallId = addWallToStore(s.editor, s.anchor, { Start: [5, 0, 0], End: [5, 8, 0], Height: 3, Thickness: .2 }).wallId;
     expect(readRoofClippedWallTop(s.store, s.view, wallId, roofId)).toBeNull();
+  });
+});
+
+describe('a wall re-cut to an edited roof', () => {
+  it('keeps the records whose ids only appear as coordinates of the replaced cut', async () => {
+    const s = await newStorey();
+    const relIds = [...(s.store.entityIndex.byType.get('IFCRELAGGREGATES') ?? [])];
+    const width = Math.max(12, ...relIds);
+    const roofId = addRoofToStore(s.editor, s.anchor, { Position: [0, 0, 4], Width: width, Depth: 8, Thickness: .25, EdgeSlopes: [SLOPE, 0, SLOPE, 0], Overhang: 0 }).roofId;
+    const wallId = addWallToStore(s.editor, s.anchor, { Start: [5, 0, 1], End: [5, 8, 1], Height: 3, Thickness: .2 }).wallId;
+    setTopConstraintInStore(s.store, s.editor, wallId, { kind: 'roof', roofId });
+    const cuts = (text: string) => text.match(/=IFCBOOLEANRESULT\(/g)?.length ?? 0;
+    const before = cuts(exportText(s));
+    editFootprintRoofInStore(s.store, s.editor, roofId, { EdgeSlopes: [Math.PI / 5, 0, Math.PI / 5, 0] });
+    const text = exportText(s);
+    expect(cuts(text)).toBe(before);
+    expect(relIds.length).toBeGreaterThan(0);
+    for (const id of relIds) expect(text).toContain(`\n#${id}=IFCRELAGGREGATES(`);
   });
 });

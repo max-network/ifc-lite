@@ -94,9 +94,10 @@ function boundary(target: ReadTarget, solid: { attributes: readonly unknown[] })
 /** Delete only unreferenced geometry from our replaced Boolean chain; keep its editable base. */
 function removeCuts(target: EditTarget, root: number, base: number): void {
   const reader = new AnchorEntityReader(target.dataStore, target.view), found = new Set<number>(), stack = [root];
-  const refs = (v: unknown): void => { if (Array.isArray(v)) v.forEach(refs); else { const id = refId(v); if (id !== null) stack.push(id); } };
-  while (stack.length) { const id = stack.pop()!; if (id === base || found.has(id)) continue; const e = reader.entity(id); if (!e) continue; found.add(id); e.attributes.forEach(refs); }
   const incoming = effectiveReferencers(target.dataStore, target.view);
+  // Parsed source holds references and integral REALs alike as numbers: follow only slots that really reference.
+  const refs = (parent: number, v: unknown): void => { if (Array.isArray(v)) v.forEach(item => refs(parent, item)); else { const id = refId(v); if (id !== null && incoming(id).includes(parent)) stack.push(id); } };
+  while (stack.length) { const id = stack.pop()!; if (id === base || found.has(id)) continue; const e = reader.entity(id); if (!e) continue; found.add(id); e.attributes.forEach(v => refs(id, v)); }
   for (let changed = true; changed;) { changed = false; for (const id of found) if (incoming(id).some(parent => !found.has(parent))) { found.delete(id); changed = true; } }
   for (const id of found) target.editor.removeEntity(id);
 }
