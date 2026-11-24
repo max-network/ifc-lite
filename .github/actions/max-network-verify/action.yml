@@ -15,21 +15,7 @@ outputs:
 runs:
   using: composite
   steps:
-    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-      with:
-        node-version: 22
-
-    - name: Enable pnpm
-      shell: bash
-      run: corepack enable
-
-    - name: Install
-      shell: bash
-      run: pnpm install --frozen-lockfile
-
-    - name: Fetch the prebuilt wasm
-      shell: bash
-      run: pnpm build:wasm:fetch
+    - uses: ./.github/actions/max-network-setup
 
     - name: Select packages
       id: select
