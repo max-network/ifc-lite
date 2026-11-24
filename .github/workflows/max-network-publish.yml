@@ -16,6 +16,7 @@ on:
     paths:
       - .github/max-network-packages.json
       - .github/workflows/max-network-publish.yml
+      - .github/actions/max-network-setup/**
       - .github/actions/max-network-verify/**
       - scripts/max-network/**
   workflow_dispatch:

@@ -1,12 +1,15 @@
 name: max-network CI
 
 on:
+  push:
+    branches: [max-network/main]
   pull_request:
     branches: [max-network/main]
+  workflow_dispatch:
 
 concurrency:
-  group: max-network-ci-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: max-network-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -19,3 +22,57 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/max-network-verify
+
+  # Committed generated output must equal a fresh run of its generator.
+  generated:
+    if: github.repository == 'max-network/ifc-lite'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      # check:codegen-sync finishes the Rust registries with `rustfmt +stable`.
+      - name: Install the stable rustfmt
+        run: rustup toolchain install stable --profile minimal --component rustfmt
+
+      - uses: ./.github/actions/max-network-setup
+
+      # The api-surface and step-log-tables gates read built dist/.
+      - name: Build every package
+        id: build
+        run: pnpm turbo build --filter='./packages/*'
+
+      # Regenerated from scratch, so a file the generator no longer writes shows as deleted.
+      - name: Regenerate the validators
+        run: |
+          rm -rf packages/validate/src/generated
+          pnpm --filter @ifc-lite/validate generate
+
+      - name: Check the validators are committed as generated
+        run: |
+          if [ -n "$(git status --porcelain -- packages/validate/src/generated)" ]; then
+            git status --short -- packages/validate/src/generated
+            git diff --stat -- packages/validate/src/generated
+            echo "::error::packages/validate/src/generated is stale. Run 'pnpm --filter @ifc-lite/validate generate' and commit the result."
+            exit 1
+          fi
+
+      - name: Check the other generated outputs
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          failed=""
+          check() {
+            echo "::group::$*"
+            "$@" || failed="$failed; $*"
+            echo "::endgroup::"
+          }
+          for script in codegen-sync ifc2x3-required-slots ifc4-required-slots ifc4-express-corrections \
+            enum-reconciliation step-log-tables api-surface bim-globals coverage-ledger; do
+            check pnpm run -s "check:$script"
+          done
+          check pnpm run -s docs:check-generated
+          check node scripts/generate-structural-coverage-ledger.mjs --check
+          if [ -n "$failed" ]; then
+            echo "::error::Stale generated output${failed}"
+            exit 1
+          fi

@@ -5878,6 +5878,7 @@
     "SpaceAnnotationOptions: interface",
     "StairArrowParameters: interface",
     "StampedSheetLayout: interface",
+    "StoreyCutFrame: type",
     "StoreyFloorMesh: interface",
     "StoreyPlanOptions: interface",
     "StreamingSectionCutterOptions: interface",
