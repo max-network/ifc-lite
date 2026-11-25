@@ -34,7 +34,8 @@ export interface OpeningSymbolOptions {
   /** Render-frame Y of the plan cut. */
   cutY: number;
   plane: SectionPlaneConfig;
-  openings?: ReadonlyMap<number, PlanOpeningInfo>;
+  /** Keyed by `makeEntityKey(modelIndex, expressId)`. */
+  openings?: ReadonlyMap<EntityKey, PlanOpeningInfo>;
   /** Restrict symbols to these express ids (the storey's elements). Default: elements crossing the cut. */
   storeyElements?: ReadonlySet<number>;
 }
@@ -71,7 +72,7 @@ export function buildOpeningSymbols(meshes: readonly MeshData[], options: Openin
   const doorGenerator = new DoorSymbolGenerator();
   const windowGenerator = new WindowSymbolGenerator();
   const symbols: PlanSymbol[] = [];
-  for (const group of groups.values()) {
+  for (const [key, group] of groups) {
     const first = group[0];
     const footprint = measureFootprint(group, plane);
     if (!footprint) continue;
@@ -80,7 +81,7 @@ export function buildOpeningSymbols(meshes: readonly MeshData[], options: Openin
       : footprint.minY < options.cutY && footprint.maxY > options.cutY;
     if (!onStorey) continue;
 
-    const info = options.openings?.get(first.expressId);
+    const info = options.openings?.get(key);
     const isDoor = DOOR_TYPES.has((first.ifcType ?? '').toLowerCase());
     const width = info?.width ?? footprint.width;
     const opening: OpeningInfo = {

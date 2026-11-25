@@ -4,17 +4,13 @@
 
 // @vitest-environment node
 
+import { createRequire } from 'node:module';
 import { describe, expect, it, vi } from 'vitest';
 
-// Runtimes that report `process.versions.node` without being Node (Cloudflare
-// workerd, with or without nodejs_compat) cannot resolve `@xmldom/xmldom` at
-// module evaluation. Importing the IDS parser must not load it: only a call
-// that actually parses IDS without a global DOMParser may.
-const xmldomLoads = vi.hoisted(() => ({ count: 0 }));
-vi.mock('@xmldom/xmldom', async (importOriginal) => {
-  xmldomLoads.count++;
-  return importOriginal();
-});
+// Runtimes that report `process.versions.node` without being Node (workerd) cannot resolve `@xmldom/xmldom`, so importing must not load it.
+// The loader reaches xmldom through createRequire, which vi.mock does not see; the CJS require cache does.
+const require = createRequire(import.meta.url);
+const xmldomEntry = require.resolve('@xmldom/xmldom');
 
 const MINIMAL_IDS = `<?xml version="1.0" encoding="UTF-8"?>
 <ids xmlns="http://standards.buildingsmart.org/IDS" xmlns:xs="http://www.w3.org/2001/XMLSchema">
@@ -29,14 +25,17 @@ const MINIMAL_IDS = `<?xml version="1.0" encoding="UTF-8"?>
 describe('parseIDS xmldom fallback', () => {
   it('does not load @xmldom/xmldom when the module is imported', async () => {
     expect('DOMParser' in globalThis).toBe(false);
+    delete require.cache[xmldomEntry];
+    vi.resetModules();
     await import('./xml-parser.js');
-    expect(xmldomLoads.count).toBe(0);
+    expect(require.cache[xmldomEntry]).toBeUndefined();
   });
 
-  it('still parses IDS on Node without a global DOMParser', async () => {
+  it('loads it on the first parse on Node without a global DOMParser', async () => {
     const { parseIDS } = await import('./xml-parser.js');
     const doc = parseIDS(MINIMAL_IDS);
     expect(doc.info.title).toBe('Lazy fallback');
     expect(doc.specifications).toHaveLength(1);
+    expect(require.cache[xmldomEntry]).toBeDefined();
   });
 });

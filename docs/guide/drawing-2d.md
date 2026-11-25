@@ -151,20 +151,22 @@ console.log(`${drawing.stats.projectionLineCount} projection lines`);
 
 ### Generating a Storey Plan Sheet
 
-`generateFloorPlan` cuts at a height in the meshes' render frame. For a sheet, `generateStoreyPlan` cuts a storey at its elevation plus the cut height in model coordinates (the render frame's RTC offset and origin shift are taken from `coordinateInfo`), draws building fabric only, puts door swings and window frames into the openings, and draws spaces as labelled room boundaries.
+`generateFloorPlan` cuts at a height in the meshes' render frame. For a sheet, `generateStoreyPlan` cuts a storey at its elevation plus the cut height in model coordinates (the render frame's RTC offset and origin shift are taken from `coordinateInfo`; `IfcBuildingStorey.Elevation` is relative to the building, so pass a building placed off its site's Z as `frame.buildingOrigin`), draws building fabric only, puts door swings and window frames into the openings, and draws spaces as labelled room boundaries.
 
 ```typescript
-import { generateStoreyPlan, exportToSVG, classifyMaterialName, type MaterialCategory } from '@ifc-lite/drawing-2d';
+import { generateStoreyPlan, exportToSVG, classifyMaterialName, makeEntityKey, type MaterialCategory } from '@ifc-lite/drawing-2d';
 
 const hierarchy = store.spatialHierarchy;
-const [storeyId, elevation] = [...(hierarchy?.storeyElevations ?? [])][0];
+// storeyElevations is empty on a store restored from the cache, so check for the storey instead of cutting at 0.
+const elevation = hierarchy?.storeyElevations.get(storeyId);
+if (elevation === undefined) throw new Error(`No elevation for storey #${storeyId}`);
 const plan = await generateStoreyPlan(geometryResult.meshes, {
   storeyElevation: elevation,
   storeyHeight: hierarchy?.storeyHeights.get(storeyId),
   frame: geometryResult.coordinateInfo,
   storeyElements: new Set(hierarchy?.byStorey.get(storeyId)),
-  // Door operation type and width, as IfcDoor / IfcDoorType state them
-  openings: new Map([[17468, { operationType: '.SINGLE_SWING_RIGHT.', width: 0.885 }]]),
+  // Door operation type and width, as IfcDoor / IfcDoorType state them, per (modelIndex, expressId)
+  openings: new Map([[makeEntityKey(0, 17468), { operationType: '.SINGLE_SWING_RIGHT.', width: 0.885 }]]),
   spaces: { labels: new Map([[1234, 'Living']]) },
 });
 

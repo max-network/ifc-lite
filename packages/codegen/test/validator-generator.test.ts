@@ -88,6 +88,18 @@ FUNCTION Outer (X : MiniLabel) : LOGICAL; RETURN (Inner(X)); END_FUNCTION;`;
     expect(coverage.unsupported[1].reason).toBe('calls Inner, which did not compile: built-in VALUE_IN is not implemented');
   });
 
+  it('emits only the FUNCTIONs a rule reaches, directly or through another FUNCTION', () => {
+    const fns = `FUNCTION Leaf (X : MiniLabel) : LOGICAL; RETURN (EXISTS(X)); END_FUNCTION;
+FUNCTION Used (X : MiniLabel) : LOGICAL; RETURN (Leaf(X)); END_FUNCTION;
+FUNCTION Orphan (K : MiniEnum) : LOGICAL; RETURN (K = MiniEnum.USERDEFINED); END_FUNCTION;`;
+    const { files, coverage } = generateValidators(mini('WR1 : Used(Name)', fns));
+    expect(files['rules.ts']).toMatch(/function fn_Used\(/);
+    expect(files['rules.ts']).toMatch(/function fn_Leaf\(/);
+    expect(files['rules.ts']).not.toMatch(/fn_Orphan/);
+    expect(files['rules.ts']).not.toMatch(/E_USERDEFINED/);
+    expect(coverage.counts.function).toEqual({ total: 3, compiled: 3 });
+  });
+
   it('rejects a qualified enumeration item the enumeration does not declare', () => {
     const { coverage } = generateValidators(mini('WR1 : Kind <> MiniEnum.MISSING'));
     expect(coverage.unsupported[0].reason).toBe('MiniEnum has no item MISSING');

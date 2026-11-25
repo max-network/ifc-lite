@@ -41,7 +41,7 @@ export function mirrorElementsInStore(store: IfcDataStore, editor: StoreEditor, 
     if (ids.some(id => liveEntityConforms(store, id, 'IfcGrid', draft.getMutationView()))) {
       throw new Error('Mirror does not support grids');
     }
-    const selected = params.copy ? copyBatchInStore(store, draft, ids, [{}]).map(r => r.copyId) : [...new Set(ids)];
+    const selected = params.copy ? copyBatchInStore(store, draft, ids, [{}], { guidRandom: options.guidRandom }).map(r => r.copyId) : [...new Set(ids)];
     const view = draft.getMutationView(), reader = new AnchorEntityReader(store, view);
     const plan = planElementTransform({ dataStore: store, view, selected, storeyOf: id => effectiveStoreyId(store, view, id) ?? null });
     if (plan.refused.length) throw new Error('Mirror requires local placements under a storey');

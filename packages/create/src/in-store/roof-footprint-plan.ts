@@ -20,7 +20,7 @@
  * rest with a reason instead of emitting a roof that is not one.
  */
 
-import { weightedStraightSkeleton, type SkeletonLine, type SkeletonSpeedChange } from './roof-skeleton.js';
+import { weightedStraightSkeleton, type SkeletonLine } from './roof-skeleton.js';
 
 export type PlanPoint = [number, number];
 export type RoofShapeType = 'FLAT_ROOF' | 'SHED_ROOF' | 'GABLE_ROOF' | 'HIP_ROOF' | 'HIPPED_GABLE_ROOF' | 'MANSARD_ROOF'

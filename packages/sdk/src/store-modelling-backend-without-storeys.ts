@@ -114,25 +114,25 @@ export function createModellingStoreBackendWithoutStoreys(resolve: ModellingStor
     ...createRoofStoreBackend(resolve),
     copyElements(modelId, expressIds, transforms) {
       const model = resolve(modelId);
-      const results = copyBatchInStore(model.store, model.editor, expressIds, transforms, { duplicate: { guidRandom: model.guidRandom } });
+      const results = copyBatchInStore(model.store, model.editor, expressIds, transforms, { guidRandom: model.guidRandom });
       return copiedElementRefs(model.modelId, copiesOfSelection(expressIds, results, transforms.length).flat());
     },
     copyToStoreys(modelId, expressIds, storeyIds) {
       const model = resolve(modelId);
-      return copyToStoreysInStore(model.store, model.editor, expressIds, storeyIds, { duplicate: { guidRandom: model.guidRandom } })
+      return copyToStoreysInStore(model.store, model.editor, expressIds, storeyIds, { guidRandom: model.guidRandom })
         .map(({ storeyId, copies }) => ({ storeyId, refs: copiedElementRefs(model.modelId, copies) }));
     },
     duplicateElement(entity, options) {
       const model = resolve(entity.modelId);
       const [result] = copyBatchInStore(model.store, model.editor, [entity.expressId], [{ offset: options.offset }],
-        { duplicate: { name: options.Name, guidRandom: model.guidRandom } });
+        { duplicate: { name: options.Name }, guidRandom: model.guidRandom });
       return ref(model.modelId, result.copyId);
     },
     arrayElements(modelId, expressIds, params) {
       const transforms = arrayCopyTransforms(params);
       if (!transforms) throw new Error('Array requires an anchor and a nonzero linear direction');
       const model = resolve(modelId);
-      const results = copyBatchInStore(model.store, model.editor, expressIds, transforms, { duplicate: { guidRandom: model.guidRandom } });
+      const results = copyBatchInStore(model.store, model.editor, expressIds, transforms, { guidRandom: model.guidRandom });
       return copiedElementRefs(model.modelId, copiesOfSelection(expressIds, results, transforms.length).flat());
     },
     editHostedElement(entity, patch) {
