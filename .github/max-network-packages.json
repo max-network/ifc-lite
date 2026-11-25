@@ -2,7 +2,7 @@
   "registry": "https://npm.pkg.github.com",
   "scope": "@max-network",
   "prefix": "ifc-lite-",
-  "prerelease": "mn.18",
+  "prerelease": "mn.19",
   "distTag": "latest",
   "repository": "https://github.com/max-network/ifc-lite",
   "packages": [
