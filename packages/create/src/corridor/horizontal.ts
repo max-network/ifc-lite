@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import type { HorizontalSegment } from '../landxml/alignment-mapping.js';
+import { evaluateSegment, type HorizontalSegment } from '../landxml/alignment-mapping.js';
 import type { CorridorProblem } from './problems.js';
 
 export type PlanXY = readonly [number, number];
@@ -34,9 +34,22 @@ function arcSegment(sourceId: string, start: PlanXY, direction: number, radius: 
   return { ...segment, end: [end.x, end.y] };
 }
 
+function clothoidSegment(sourceId: string, start: PlanXY, direction: number, startCurvature: number, endCurvature: number, length: number): HorizontalSegment {
+  const end = evaluateSegment(start, direction, startCurvature, endCurvature, length);
+  const radius = (curvature: number) => (curvature === 0 ? 0 : 1 / curvature);
+  return {
+    sourceId, type: 'CLOTHOID', start, direction, startRadius: radius(startCurvature), endRadius: radius(endCurvature), length,
+    end: end.point, endDirection: end.direction, startCurvature, endCurvature,
+  };
+}
+
 function frameOn(segment: HorizontalSegment, t: number): HorizontalFrame {
   const [x0, y0] = segment.start;
   const theta0 = segment.direction;
+  if (segment.type === 'CLOTHOID') {
+    const at = evaluateSegment(segment.start, theta0, segment.startCurvature, segment.endCurvature, segment.length, t);
+    return { x: at.point[0], y: at.point[1], direction: at.direction };
+  }
   if (segment.type !== 'CIRCULARARC' || segment.startRadius === 0) {
     return { x: x0 + Math.cos(theta0) * t, y: y0 + Math.sin(theta0) * t, direction: theta0 };
   }
@@ -72,6 +85,34 @@ interface Turn {
   radius: number;
   tangent: number;
   given: boolean;
+  transition: number;
+}
+
+const RADIUS_STEPS = 200;
+
+function spiralOffsets(radius: number, transition: number): { shift: number; lead: number } {
+  if (transition === 0) return { shift: 0, lead: 0 };
+  const { point: [x, y] } = evaluateSegment([0, 0], 0, 0, 1 / radius, transition);
+  const theta = transition / (2 * radius);
+  return { shift: y - radius * (1 - Math.cos(theta)), lead: x - radius * Math.sin(theta) };
+}
+
+function tangentLength(radius: number, transition: number, delta: number): number {
+  const { shift, lead } = spiralOffsets(radius, transition);
+  return (radius + shift) * Math.tan(Math.abs(delta) / 2) + lead;
+}
+
+function radiusForTangent(tangent: number, transition: number, delta: number): number {
+  if (transition === 0) return tangent / Math.tan(Math.abs(delta) / 2);
+  let lo = transition / Math.abs(delta);
+  if (tangentLength(lo, transition, delta) >= tangent) return lo;
+  let hi = Math.max(lo * 2, (tangent / Math.tan(Math.abs(delta) / 2)) * 2);
+  for (let step = 0; step < RADIUS_STEPS && hi - lo > LENGTH_EPS * Math.max(1, hi); step++) {
+    const mid = (lo + hi) / 2;
+    if (tangentLength(mid, transition, delta) > tangent) hi = mid;
+    else lo = mid;
+  }
+  return lo;
 }
 
 /**
@@ -81,6 +122,7 @@ interface Turn {
  */
 export function centrelineSegments(
   points: readonly PlanXY[], radii: readonly (number | null | undefined)[], halfWidth: number,
+  transitions: readonly (number | null | undefined)[] = [],
 ): { segments: HorizontalSegment[]; problems: CorridorProblem[] } {
   const problems: CorridorProblem[] = [];
   if (points.length < 2) return { segments: [], problems: [{ code: 'centreline', values: { points: points.length } }] };
@@ -95,25 +137,31 @@ export function centrelineSegments(
 
   const last = points.length - 2;
   const turns: Turn[] = points.map((_, i): Turn => {
-    if (i === 0 || i > last) return { delta: 0, radius: 0, tangent: 0, given: false };
+    if (i === 0 || i > last) return { delta: 0, radius: 0, tangent: 0, given: false, transition: 0 };
     const delta = wrap(legs[i].direction - legs[i - 1].direction);
-    const half = Math.abs(delta) / 2;
-    if (Math.abs(delta) < ANGLE_EPS) return { delta: 0, radius: 0, tangent: 0, given: false };
+    if (Math.abs(delta) < ANGLE_EPS) return { delta: 0, radius: 0, tangent: 0, given: false, transition: 0 };
     const stated = radii[i - 1];
     const given = typeof stated === 'number';
-    if (Math.abs(delta) >= U_TURN) return { delta, radius: given ? stated : 0, tangent: Infinity, given };
+    const spiral = transitions[i - 1];
+    const transition = typeof spiral === 'number' && spiral > 0 ? spiral : 0;
+    if (Math.abs(delta) >= U_TURN) return { delta, radius: given ? stated : 0, tangent: Infinity, given, transition };
     const room = Math.min(i - 1 === 0 ? legs[i - 1].length : legs[i - 1].length / 2, i === last ? legs[i].length : legs[i].length / 2);
-    const radius = given ? stated : room / Math.tan(half);
-    return { delta, radius, tangent: radius * Math.tan(half), given };
+    const radius = given ? stated : radiusForTangent(room, transition, delta);
+    if (transition > radius * Math.abs(delta) + LENGTH_EPS) return { delta, radius, tangent: 0, given, transition };
+    return { delta, radius, tangent: given ? tangentLength(radius, transition, delta) : room, given, transition };
   });
 
   turns.forEach((turn, i) => {
     if (turn.delta === 0) return;
+    if (turn.transition > turn.radius * Math.abs(turn.delta) + LENGTH_EPS) {
+      problems.push({ code: 'transition_too_long', vertex: i, values: { transition: turn.transition, maxTransition: turn.radius * Math.abs(turn.delta) } });
+      return;
+    }
     const available = Math.min(legs[i - 1].length - turns[i - 1].tangent, legs[i].length - (turns[i + 1]?.tangent ?? 0));
     if (turn.tangent > available + LENGTH_EPS) {
       problems.push({
         code: 'radius_too_large', vertex: i,
-        values: { radius: turn.radius, maxRadius: Math.max(0, available) / Math.tan(Math.abs(turn.delta) / 2) },
+        values: { radius: turn.radius, maxRadius: radiusForTangent(Math.max(0, available), turn.transition, turn.delta) },
       });
     } else if (turn.radius < halfWidth) {
       problems.push({ code: 'radius_below_half_width', vertex: i, values: { radius: turn.radius, halfWidth } });
@@ -133,7 +181,14 @@ export function centrelineSegments(
       const p = points[j + 1];
       const at: PlanXY = [p[0] - Math.cos(leg.direction) * endTangent, p[1] - Math.sin(leg.direction) * endTangent];
       const radius = Math.sign(turn.delta) * turn.radius;
-      segments.push(arcSegment(`arc:${j + 1}`, at, leg.direction, radius, turn.radius * Math.abs(turn.delta)));
+      const arcLength = turn.radius * Math.abs(turn.delta) - turn.transition;
+      if (turn.transition === 0) {
+        segments.push(arcSegment(`arc:${j + 1}`, at, leg.direction, radius, arcLength));
+      } else {
+        const entry = clothoidSegment(`spiral-in:${j + 1}`, at, leg.direction, 0, 1 / radius, turn.transition);
+        const arc = arcSegment(`arc:${j + 1}`, entry.end, entry.endDirection, radius, arcLength);
+        segments.push(entry, arc, clothoidSegment(`spiral-out:${j + 1}`, arc.end, arc.endDirection, 1 / radius, 0, turn.transition));
+      }
     }
   });
   return { segments, problems };
