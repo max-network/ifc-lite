@@ -36,6 +36,8 @@ async function authoredExport(guidRandom: RandomSource): Promise<string> {
     S.addGrid('m', home, { Name: 'Grid', UAxes: [{ Tag: 'A', Start: [0, 0], End: [0, 20] }], VAxes: [{ Tag: '1', Start: [-1, 0], End: [10, 0] }] });
     S.copyElements('m', [a.expressId], [{ offset: [0, 6, 0] }]);
     S.copyToStoreys('m', [b.expressId], [upper.expressId]);
+    const c = S.addWall('m', home, { Start: [10, 10, 0], End: [12, 10, 0], Thickness: 0.2, Height: 3 });
+    S.mirrorElements('m', [c.expressId], { axis: [[0, 20], [1, 20]], copy: true });
     bim.mutate.setProperty(a, 'Pset_WallCommon', 'IsExternal', true);
     const content = bim.export.ifc();
     return typeof content === 'string' ? content : new TextDecoder().decode(content);
@@ -62,5 +64,19 @@ describe('HeadlessBackendOptions.guidRandom', () => {
     expect(authoredGlobalIds(again, source)).toEqual(authored);
     expect(dataSection(again)).toBe(dataSection(first));
     expect(authoredGlobalIds(other, source)).not.toEqual(authored);
+  });
+
+  it.each([['seeded', seeded(1)], ['unseeded', undefined]])('keeps the source Name on %s copies', async (_, guidRandom) => {
+    const model = await openModel(readFileSync(SAMPLE), { modelId: 'm', disableWorkerScan: true, backend: { guidRandom } });
+    try {
+      const { bim } = model, S = bim.store;
+      const home = S.listStoreyLevels('m')[0].expressId;
+      const upper = S.addStorey('m', { Name: 'Upper', Elevation: 3 });
+      const wall = S.addWall('m', home, { Start: [0, 10, 0], End: [6, 10, 0], Thickness: 0.2, Height: 3, Name: 'W1' });
+      const [copy] = S.copyElements('m', [wall.expressId], [{ offset: [0, 6, 0] }]);
+      const [arrayed] = S.arrayElements('m', [wall.expressId], { mode: 'linear', count: 2, anchor: [0, 0], cursor: [0, 3], distance: 3 });
+      const [{ refs: [onUpper] }] = S.copyToStoreys('m', [wall.expressId], [upper.expressId]);
+      expect([copy, arrayed, onUpper].map((r) => bim.entity(r)?.name)).toEqual(['W1', 'W1', 'W1']);
+    } finally { model.close(); }
   });
 });

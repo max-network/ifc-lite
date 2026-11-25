@@ -8,6 +8,7 @@ import type { IfcDataStore } from '@ifc-lite/parser';
 import type { CopyShape } from './copy-shape.js';
 import { copyProductGraph, copyRefusal, createCopyContext, productStoreyOrigin, type CopyContext, type CopyProductResult, type CopyTransform } from './copy-product.js';
 import { openTypeRelationBatch, type DuplicateInStoreOptions } from './duplicate.js';
+import type { AuthoringGuidOptions } from './anchor.js';
 import { copiedProductWork, COPY_PRODUCT_WORK_LIMIT } from './copy-dependent-walk.js';
 import { readCopyAttachments, rebindCopiedAttachments, withUnattachedTops, type CopyUnattachedTop } from './copy-attachment.js';
 import { duplicateSourceStoreyId, type DuplicateSourceScope } from './resolve-source.js';
@@ -61,10 +62,10 @@ export function copiedProductsInStore(ctx: CopyContext, ids: readonly number[]):
   return [...shown];
 }
 
-export interface CopyBatchOptions {
+export interface CopyBatchOptions extends AuthoringGuidOptions {
   /** Deep-copy file shape records with 'own'; default 'shared' keeps current behaviour (#8447). */
   readonly shape?: CopyShape;
-  /** Duplicate's naming/randomness policy; displacement is supplied by transforms. */
+  /** Duplicate's naming/randomness policy; displacement is supplied by transforms. Unset, copies keep the source Name. */
   readonly duplicate?: Pick<DuplicateInStoreOptions, 'name' | 'guidRandom'>;
 }
 
@@ -93,7 +94,7 @@ export function copyBatchInStore(
   }
   return editor.runAtomic((draft) => {
     const sourceScope: DuplicateSourceScope = { storeys: new Map() };
-    const ctx: CopyContext = { ...createCopyContext(store, draft, { guidRandom: options.duplicate?.guidRandom }), sourceScope };
+    const ctx: CopyContext = { ...createCopyContext(store, draft, { guidRandom: options.guidRandom ?? options.duplicate?.guidRandom }), sourceScope };
     for (const transform of transforms) {
       if (transform.targetStoreyId !== undefined && ctx.read(transform.targetStoreyId)?.type.toUpperCase() !== 'IFCBUILDINGSTOREY') throw new Error('Copy targetStoreyId must identify an IfcBuildingStorey in this model');
     }
