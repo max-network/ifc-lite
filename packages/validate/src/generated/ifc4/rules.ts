@@ -1420,56 +1420,6 @@ function fn_IfcVectorDifference(m: r.Model, p_arg1: r.Value, p_arg2: r.Value): r
   return undefined;
 }
 
-function fn_IfcVectorSum(m: r.Model, p_arg1: r.Value, p_arg2: r.Value): r.Value {
-  let v_result: r.Value = undefined;
-  let v_res: r.Value = undefined;
-  let v_vec1: r.Value = undefined;
-  let v_vec2: r.Value = undefined;
-  let v_mag: r.Value = undefined;
-  let v_mag1: r.Value = undefined;
-  let v_mag2: r.Value = undefined;
-  let v_ndim: r.Value = undefined;
-  if (r.isTrue(r.or(r.or(r.not(r.exists(p_arg1)), () => r.not(r.exists(p_arg2))), () => r.ne(r.attr(p_arg1, "DIM"), r.attr(p_arg2, "DIM"))))) {
-    return undefined;
-  } else {
-    {
-      if (r.isTrue(r.typeIs(m, p_arg1, "IFCVECTOR"))) {
-        v_mag1 = r.assign(r.attr(p_arg1, "MAGNITUDE"));
-        v_vec1 = r.assign(r.attr(p_arg1, "ORIENTATION"));
-      } else {
-        v_mag1 = r.assign(1);
-        v_vec1 = r.assign(p_arg1);
-      }
-      if (r.isTrue(r.typeIs(m, p_arg2, "IFCVECTOR"))) {
-        v_mag2 = r.assign(r.attr(p_arg2, "MAGNITUDE"));
-        v_vec2 = r.assign(r.attr(p_arg2, "ORIENTATION"));
-      } else {
-        v_mag2 = r.assign(1);
-        v_vec2 = r.assign(p_arg2);
-      }
-      v_vec1 = r.assign(fn_IfcNormalise(m, v_vec1));
-      v_vec2 = r.assign(fn_IfcNormalise(m, v_vec2));
-      v_ndim = r.assign(r.sizeof(r.attr(v_vec1, "DIRECTIONRATIOS")));
-      v_mag = r.assign(0);
-      v_res = r.assign(r.complex(m, [r.construct(m, "IfcRepresentationItem", []), r.construct(m, "IfcGeometricRepresentationItem", []), r.construct(m, "IfcDirection", [r.aggregate([[0, v_ndim]])])]));
-      {
-        const from167 = r.int(1), to168 = r.int(v_ndim), by169 = 1;
-        if (from167 !== undefined && to168 !== undefined && by169) for (let i_i166 = from167; by169 > 0 ? i_i166 <= to168 : i_i166 >= to168; i_i166 += by169) {
-          r.setIndex(r.attr(v_res, "DIRECTIONRATIOS"), i_i166, r.add(r.mul(v_mag1, r.index(r.attr(v_vec1, "DIRECTIONRATIOS"), i_i166)), r.mul(v_mag2, r.index(r.attr(v_vec2, "DIRECTIONRATIOS"), i_i166))));
-          v_mag = r.assign(r.add(v_mag, r.mul(r.index(r.attr(v_res, "DIRECTIONRATIOS"), i_i166), r.index(r.attr(v_res, "DIRECTIONRATIOS"), i_i166))));
-        }
-      }
-      if (r.isTrue(r.gt(v_mag, 0))) {
-        v_result = r.assign(r.complex(m, [r.construct(m, "IfcRepresentationItem", []), r.construct(m, "IfcGeometricRepresentationItem", []), r.construct(m, "IfcVector", [v_res, r.sqrt(v_mag)])]));
-      } else {
-        v_result = r.assign(r.complex(m, [r.construct(m, "IfcRepresentationItem", []), r.construct(m, "IfcGeometricRepresentationItem", []), r.construct(m, "IfcVector", [v_vec1, 0])]));
-      }
-    }
-  }
-  return v_result;
-  return undefined;
-}
-
 export const RULES: r.CompiledRules = {
   entity: {
     "IfcActorRole": [

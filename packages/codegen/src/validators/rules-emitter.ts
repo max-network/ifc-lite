@@ -33,9 +33,14 @@ function reasonOf(e: unknown): string {
   throw e;
 }
 
-function compileFunctions(index: SchemaIndex, ctx: TranslateContext, stmts: StatementTranslator): Map<string, string> {
+interface CompiledFunction {
+  source: string;
+  calls: Set<string>;
+}
+
+function compileFunctions(index: SchemaIndex, ctx: TranslateContext, stmts: StatementTranslator): Map<string, CompiledFunction> {
   const unsupported = ctx.unsupportedFunctions;
-  const compiled = new Map<string, { source: string; calls: Set<string> }>();
+  const compiled = new Map<string, CompiledFunction>();
   for (const fn of index.schema.functions) {
     ctx.calls = new Set();
     try {
@@ -54,7 +59,19 @@ function compileFunctions(index: SchemaIndex, ctx: TranslateContext, stmts: Stat
       changed = true;
     }
   }
-  return new Map([...compiled].map(([k, v]) => [k, v.source]));
+  return compiled;
+}
+
+/** Upper names of the functions `roots` call, directly or through another compiled function. */
+function reachableFunctions(roots: ReadonlySet<string>, functions: ReadonlyMap<string, CompiledFunction>): Set<string> {
+  const reached = new Set<string>();
+  const pending = [...roots];
+  for (let name = pending.pop(); name !== undefined; name = pending.pop()) {
+    if (reached.has(name)) continue;
+    reached.add(name);
+    pending.push(...(functions.get(name)?.calls ?? []));
+  }
+  return reached;
 }
 
 function indent(text: string, pad: string): string {
@@ -67,6 +84,13 @@ export function compileRules(index: SchemaIndex, header: string, runtimeImport: 
   const expr = new ExpressionTranslator(ctx);
   const stmts = new StatementTranslator(expr);
   const functions = compileFunctions(index, ctx, stmts);
+  const roots = new Set<string>();
+  const tracked = (translate: () => string): string => {
+    ctx.calls = new Set();
+    const source = translate();
+    for (const call of ctx.calls) roots.add(call);
+    return source;
+  };
   const unsupported: UnsupportedEntry[] = [];
   const counts: RuleCompilation['counts'] = {
     entity: { total: 0, compiled: 0 }, type: { total: 0, compiled: 0 }, derived: { total: 0, compiled: 0 },
@@ -83,7 +107,7 @@ export function compileRules(index: SchemaIndex, header: string, runtimeImport: 
     for (const d of e.derived) {
       counts.derived.total++;
       try {
-        derived.push(`    ${JSON.stringify(`${e.name}.${d.redeclares?.attribute ?? d.name}`)}: (self: r.EntityInstance, m: r.Model): r.Value => ${expr.translate(d.expr, new Scope('entity', e))},`);
+        derived.push(`    ${JSON.stringify(`${e.name}.${d.redeclares?.attribute ?? d.name}`)}: (self: r.EntityInstance, m: r.Model): r.Value => ${tracked(() => expr.translate(d.expr, new Scope('entity', e)))},`);
         counts.derived.compiled++;
       } catch (err) {
         const reason = reasonOf(err);
@@ -99,7 +123,7 @@ export function compileRules(index: SchemaIndex, header: string, runtimeImport: 
 
   const entityRules: string[] = [];
   for (const e of index.schema.entities) {
-    const rules = entityRuleSources(e, expr, dependsOnFailedDerived, unsupported, counts);
+    const rules = entityRuleSources(e, (w) => tracked(() => expr.translate(w.expr, new Scope('entity', e))), dependsOnFailedDerived, unsupported, counts);
     if (rules.length) entityRules.push(`    ${JSON.stringify(e.name)}: [\n${rules.join('\n')}\n    ],`);
   }
 
@@ -109,7 +133,7 @@ export function compileRules(index: SchemaIndex, header: string, runtimeImport: 
     for (const w of t.where) {
       counts.type.total++;
       try {
-        rules.push(`      { label: ${JSON.stringify(w.label)}, source: ${JSON.stringify(w.source)}, check: (self: r.Value, m: r.Model): r.Value => ${expr.translate(w.expr, new Scope('type'))} },`);
+        rules.push(`      { label: ${JSON.stringify(w.label)}, source: ${JSON.stringify(w.source)}, check: (self: r.Value, m: r.Model): r.Value => ${tracked(() => expr.translate(w.expr, new Scope('type')))} },`);
         counts.type.compiled++;
       } catch (err) {
         unsupported.push({ scope: 'type', owner: t.name, label: w.label, reason: reasonOf(err) });
@@ -122,7 +146,7 @@ export function compileRules(index: SchemaIndex, header: string, runtimeImport: 
   for (const rule of index.schema.rules) {
     counts.global.total += rule.where.length;
     try {
-      const run = stmts.ruleSource(rule);
+      const run = tracked(() => stmts.ruleSource(rule));
       const labels = rule.where.map((w) => `{ label: ${JSON.stringify(w.label)}, source: ${JSON.stringify(w.source)} }`);
       globalRules.push(`    { name: ${JSON.stringify(rule.name)}, appliesTo: ${JSON.stringify(rule.appliesTo.map((a) => index.canonical(a) ?? a))}, rules: [${labels.join(', ')}], run: ${indent(run, '  ')} },`);
       counts.global.compiled += rule.where.length;
@@ -132,8 +156,13 @@ export function compileRules(index: SchemaIndex, header: string, runtimeImport: 
     }
   }
 
-  const constants = [...ctx.constants].map(([name, init]) => `const ${name} = ${init};`);
-  const fnSources = index.schema.functions.map((f) => functions.get(f.name.toUpperCase())).filter((s): s is string => !!s);
+  const reached = reachableFunctions(roots, functions);
+  const fnSources = index.schema.functions
+    .filter((f) => reached.has(f.name.toUpperCase()))
+    .map((f) => functions.get(f.name.toUpperCase())?.source)
+    .filter((s): s is string => !!s);
+  const body = [fnSources, entityRules, typeRules, derived, globalRules].flat().join('\n');
+  const constants = [...ctx.constants].filter(([name]) => new RegExp(`\\b${name}\\b`).test(body)).map(([name, init]) => `const ${name} = ${init};`);
   const source = `${header}
 import * as r from '${runtimeImport}';
 
@@ -162,7 +191,7 @@ ${globalRules.join('\n')}
 
 function entityRuleSources(
   e: EntityDecl,
-  expr: ExpressionTranslator,
+  translate: (w: EntityDecl['where'][number]) => string,
   dependsOnFailedDerived: (source: string) => string | undefined,
   unsupported: UnsupportedEntry[],
   counts: RuleCompilation['counts'],
@@ -173,7 +202,7 @@ function entityRuleSources(
     try {
       const failed = dependsOnFailedDerived(w.source);
       if (failed) throw new UnsupportedConstruct(`depends on derived attribute ${failed}, which did not compile`);
-      out.push(`      { label: ${JSON.stringify(w.label)}, source: ${JSON.stringify(w.source)}, check: (self: r.EntityInstance, m: r.Model): r.Value => ${expr.translate(w.expr, new Scope('entity', e))} },`);
+      out.push(`      { label: ${JSON.stringify(w.label)}, source: ${JSON.stringify(w.source)}, check: (self: r.EntityInstance, m: r.Model): r.Value => ${translate(w)} },`);
       counts.entity.compiled++;
     } catch (err) {
       unsupported.push({ scope: 'entity', owner: e.name, label: w.label, reason: reasonOf(err) });
