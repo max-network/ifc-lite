@@ -27,6 +27,7 @@ import type {
   WallJoinApplyOptions,
   InStoreReplacementElement,
   StairInStoreParams,
+  SpiralStairInStoreParams,
   RailingInStoreParams,
 } from '@ifc-lite/create';
 import type { RoomCommand, RoomCommandResult } from './store-room-command.js';
@@ -73,6 +74,8 @@ export interface ModellingStoreBackendMethods extends PhysicalStoreBackendMethod
   replaceElement?(ref: EntityRef, storeyExpressId: number, element: InStoreReplacementElement): EntityRef;
   /** Optional host capability: a storey-local IfcStair aggregating one IfcStairFlight. Returns the stair. */
   addStair?(modelId: string, storeyExpressId: number, params: StairInStoreParams): EntityRef;
+  /** Optional host capability: a storey-local spiral IfcStair aggregating one IfcStairFlight. Returns the stair. */
+  addSpiralStair?(modelId: string, storeyExpressId: number, params: SpiralStairInStoreParams): EntityRef;
   /** Optional host capability: an IfcRailing along a storey-local polyline. Returns the railing. */
   addRailing?(modelId: string, storeyExpressId: number, params: RailingInStoreParams): EntityRef;
   /** Optional host capability: atomically remove a uniquely owned single-flight stair assembly. */

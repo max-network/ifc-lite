@@ -9,7 +9,7 @@ import type {
   HostedElementEdit, CurtainWallInStoreParams, GridInStoreParams, GridColumnBinding, ColumnInStoreParams, ProfiledColumnInStoreParams,
   HostedDoorInStoreParams, HostedWindowInStoreParams, OpeningInStoreParams, ElementTypeInStoreParams,
   MaterialInStoreParams, MaterialLayerSetInStoreParams, MaterialLayerSetUsageInStoreParams, WallJoinApplyOptions,
-  StairInStoreParams, RailingInStoreParams, InStoreReplacementElement,
+  StairInStoreParams, SpiralStairInStoreParams, RailingInStoreParams, InStoreReplacementElement,
 } from '@ifc-lite/create';
 import type { RoomCommand, RoomCommandResult } from '../store-room-command.js';
 import type { BimBackend, EntityRef } from '../types.js';
@@ -152,6 +152,13 @@ export class StoreModellingNamespace {
   addStair(modelId: string, storeyExpressId: number, params: StairInStoreParams): EntityRef {
     const create = this.backend.store.addStair;
     if (!create) throw new Error('bim.store.addStair is not supported by this backend');
+    return create.call(this.backend.store, modelId, storeyExpressId, params);
+  }
+
+  /** Add a storey-local spiral stair around a newel and its aggregated flight; lengths are metres, angles radians. */
+  addSpiralStair(modelId: string, storeyExpressId: number, params: SpiralStairInStoreParams): EntityRef {
+    const create = this.backend.store.addSpiralStair;
+    if (!create) throw new Error('bim.store.addSpiralStair is not supported by this backend');
     return create.call(this.backend.store, modelId, storeyExpressId, params);
   }
 

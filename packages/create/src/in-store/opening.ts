@@ -28,13 +28,14 @@ import {
   emitBodyRepresentation,
   emitExtrudedSolid,
   emitLocalPlacement,
+  emitPolygonProfile,
   emitRectangleProfile,
   ifcElementHeader,
   ownerHistoryRef,
 } from './_emit-helpers.js';
 import { archedOpeningPath } from './arch/arched-outline.js';
 import { headRise, type OpeningHead } from './arch/opening-head.js';
-import { emitPathProfile } from './arch/profile-path.js';
+import { circlePath, emitPathProfile } from './arch/profile-path.js';
 
 /** Metres the default cut overshoots each face of the host, so no skin survives. */
 const CUT_CLEARANCE_M = 0.05;
@@ -73,7 +74,21 @@ export interface SlabOpeningInStoreParams extends OpeningCommonParams {
   Rotation?: number;
 }
 
-export type OpeningInStoreParams = WallOpeningInStoreParams | SlabOpeningInStoreParams;
+export interface SlabCircleOpeningInStoreParams extends OpeningCommonParams {
+  Position: [number, number];
+  Radius: number;
+}
+
+export interface SlabOutlineOpeningInStoreParams extends OpeningCommonParams {
+  Position: [number, number];
+  Outline: ReadonlyArray<readonly [number, number]>;
+}
+
+export type OpeningInStoreParams =
+  | WallOpeningInStoreParams
+  | SlabOpeningInStoreParams
+  | SlabCircleOpeningInStoreParams
+  | SlabOutlineOpeningInStoreParams;
 
 export interface OpeningBuildResult {
   openingId: number;
@@ -179,10 +194,10 @@ function wallOpeningGeometry(editor: StoreEditor, host: HostAnchor, params: Open
 function slabOpeningGeometry(editor: StoreEditor, host: HostAnchor, params: OpeningInStoreParams): OpeningGeometry {
   const op = 'addOpeningToStore';
   if (!('Position' in params)) throw new Error(`${op}: host #${host.hostId} is a slab; pass Position/Width/Depth (slab opening params)`);
-  assertPositiveFinite([params.Width, params.Depth], `${op}: Width and Depth must be positive`);
   if (!params.Position.every(Number.isFinite)) throw new Error(`${op}: Position must be finite`);
-  const rotation = params.Rotation ?? 0;
+  const rotation = 'Rotation' in params ? params.Rotation ?? 0 : 0;
   if (!Number.isFinite(rotation)) throw new Error(`${op}: Rotation must be finite`);
+  const profileId = slabOpeningProfile(editor, host, params, op);
 
   const bounds = host.hostBounds;
   const thickness = bounds ? bounds.max[2] - bounds.min[2] : null;
@@ -194,7 +209,23 @@ function slabOpeningGeometry(editor: StoreEditor, host: HostAnchor, params: Open
     toNativeLength(host, params.Position[1]),
     centreZ - cutDepth / 2,
   ], rotation === 0 ? undefined : [0, 0, 1], rotation === 0 ? undefined : [Math.cos(rotation), Math.sin(rotation), 0]);
-  const profileId = emitRectangleProfile(editor, toNativeLength(host, params.Width), toNativeLength(host, params.Depth));
   const solidId = emitExtrudedSolid(editor, profileId, cutDepth);
   return { placementId, profileId, solidId, cutDepth };
+}
+
+type SlabOpeningParams = SlabOpeningInStoreParams | SlabCircleOpeningInStoreParams | SlabOutlineOpeningInStoreParams;
+
+function slabOpeningProfile(editor: StoreEditor, host: HostAnchor, params: SlabOpeningParams, op: string): number {
+  if ('Radius' in params) {
+    assertPositiveFinite([params.Radius], `${op}: Radius must be positive`);
+    return emitPathProfile(editor, host.schema, circlePath(toNativeLength(host, params.Radius)));
+  }
+  if ('Outline' in params) {
+    if (params.Outline.length < 3 || !params.Outline.every((point) => point.every(Number.isFinite))) {
+      throw new Error(`${op}: Outline needs at least three finite points`);
+    }
+    return emitPolygonProfile(editor, params.Outline.map(([x, y]): [number, number] => [toNativeLength(host, x), toNativeLength(host, y)]));
+  }
+  assertPositiveFinite([params.Width, params.Depth], `${op}: Width and Depth must be positive`);
+  return emitRectangleProfile(editor, toNativeLength(host, params.Width), toNativeLength(host, params.Depth));
 }

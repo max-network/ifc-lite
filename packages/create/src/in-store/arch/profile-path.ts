@@ -27,6 +27,16 @@ export function linePath(points: readonly Pt2[]): ProfilePath {
   return { start: points[0], segments: points.slice(1).map((to) => ({ kind: 'line', to })) };
 }
 
+export function circlePath(radius: number): ProfilePath {
+  return {
+    start: [radius, 0],
+    segments: [
+      { kind: 'arc', via: [0, radius], to: [-radius, 0] },
+      { kind: 'arc', via: [0, -radius], to: [radius, 0] },
+    ],
+  };
+}
+
 export function scalePath(path: ProfilePath, scale: (value: number) => number): ProfilePath {
   const at = ([x, y]: Pt2): Pt2 => [scale(x), scale(y)];
   return {

@@ -44,6 +44,12 @@ export {
 export { addStairToStore, stairFlightOutline, type StairInStoreParams, type StairBuildResult } from './stair.js';
 export { readStairDimensions, editStairDimensionsInStore, type StairDimensions, type StairDimensionEdit } from './stair-edit.js';
 export { removeStairInStore } from './stair-removal.js';
+export {
+  addSpiralStairToStore, spiralStairEdges, spiralTreadPath, type SpiralStairInStoreParams, type SpiralStairBuildResult,
+  type SpiralStairEdges, type SpiralTurn,
+} from './stair-spiral.js';
+export { readSpiralStair, type SpiralStairRead } from './stair-spiral-read.js';
+export { circlePath, sampleArc, type ProfilePath, type Pt2 } from './arch/profile-path.js';
 export { addRailingToStore, railingPostPoints, type RailingInStoreParams, type RailingBuildResult } from './railing.js';
 export { addCurtainWallToStore, curtainWallLayout, type CurtainWallInStoreParams, type CurtainWallGridSpec, type CurtainWallLayout, type CurtainWallBuildResult } from './curtain-wall.js';
 export {
@@ -57,6 +63,8 @@ export {
   type OpeningInStoreParams,
   type WallOpeningInStoreParams,
   type SlabOpeningInStoreParams,
+  type SlabCircleOpeningInStoreParams,
+  type SlabOutlineOpeningInStoreParams,
   type OpeningBuildResult,
 } from './opening.js';
 export {

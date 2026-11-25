@@ -55,6 +55,7 @@ export function readHostOpeningExtents(
     if (relatingHost !== hostId) continue;
     const openingId = refId(rel.attributes[5]);
     if (openingId === null) { unreadable.push(id); continue; }
+    if (view?.isDeleted(openingId)) continue;
     const fill = readHostedFill(store, openingId, view);
     const bounds = fill ? placedBodyExtent(store, openingId, view) : null;
     if (!fill || fill.hostId !== hostId || !bounds) unreadable.push(openingId);

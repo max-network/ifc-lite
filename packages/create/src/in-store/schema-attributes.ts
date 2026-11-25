@@ -20,6 +20,7 @@
  */
 
 import { getSchemaRegistryForVersion, getCanonicalEntityName, type SchemaRegistry, type SchemaEntityNameSnapshot } from '@ifc-lite/parser';
+import type { IfcAttributeValue } from '@ifc-lite/data';
 import type { SpatialAnchorSchema } from './anchor.js';
 
 type Schema = Exclude<SpatialAnchorSchema, 'IFC5'>;
@@ -109,4 +110,20 @@ export function schemaAttributes(
     }
     return value;
   });
+}
+
+function attributeValue(value: unknown, op: string): IfcAttributeValue {
+  if (value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+  if (Array.isArray(value)) return value.map((item) => attributeValue(item, op));
+  if (typeof value === 'object' && 'real' in value && typeof value.real === 'number') return { real: value.real };
+  throw new Error(`${op}: an attribute value cannot be written`);
+}
+
+export function schemaEntityAttributes(
+  registry: SchemaRegistry,
+  type: string,
+  values: Readonly<Record<string, unknown>>,
+  op: string,
+): IfcAttributeValue[] {
+  return schemaAttributes(registry, type, values, op).map((value) => attributeValue(value, op));
 }
