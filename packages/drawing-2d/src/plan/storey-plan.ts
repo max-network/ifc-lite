@@ -9,12 +9,12 @@
  */
 
 import type { MeshData } from '@ifc-lite/geometry';
-import type { Drawing2D, Line2D, ProfileEntry } from '../types.js';
+import { makeEntityKey, type Drawing2D, type EntityKey, type Line2D, type ProfileEntry } from '../types.js';
 import { boundsExtendLine, boundsExtendPoint } from '../math.js';
 import { Drawing2DGenerator, createSectionConfig, type GeneratorOptions } from '../drawing-generator.js';
 import { PLAN_ELEMENT_FILTER, selectDrawableMeshes, type DrawingElementFilter } from './element-filter.js';
 import { DEFAULT_PLAN_CUT_HEIGHT, storeyCutElevation, type StoreyCutFrame } from './storey-frame.js';
-import { buildOpeningSymbols, isOpeningFillingType } from './opening-symbols.js';
+import { buildOpeningSymbols } from './opening-symbols.js';
 import { buildSpaceAnnotations } from './space-annotations.js';
 import type { PlanLabel, PlanOpeningInfo, PlanSymbol } from './plan-types.js';
 import { buildPlanDimensions, planDimensionGraphics } from './dimensions/chains.js';
@@ -33,10 +33,10 @@ export interface StoreyPlanOptions {
   scale?: number;
   /** Which meshes are drawn. Default {@link PLAN_ELEMENT_FILTER}. */
   elementFilter?: DrawingElementFilter;
-  /** Draw doors and windows as symbols instead of cutting their bodies. Default true. */
+  /** Draw the storey's doors and windows as symbols instead of their bodies; the others keep their projection. Default true. */
   openingSymbols?: boolean;
-  /** Operation type, width and host thickness per door/window express id. */
-  openings?: ReadonlyMap<number, PlanOpeningInfo>;
+  /** Operation type, width and host thickness per door/window, keyed by `makeEntityKey(modelIndex, expressId)`. */
+  openings?: ReadonlyMap<EntityKey, PlanOpeningInfo>;
   /** The storey's element ids: symbols and labels are limited to them. Default: what crosses the cut. */
   storeyElements?: ReadonlySet<number>;
   /** Draw spaces as room boundaries, labelled from `labels`. Omit to leave spaces out. */
@@ -67,7 +67,11 @@ export async function generateStoreyPlan(meshes: readonly MeshData[], options: S
   const filter = options.elementFilter ?? PLAN_ELEMENT_FILTER;
   const drawable = selectDrawableMeshes(meshes, filter);
   const symbolize = options.openingSymbols ?? true;
-  const fabric = symbolize ? drawable.filter((m) => !isOpeningFillingType(m.ifcType)) : drawable;
+  const symbols: PlanSymbol[] = symbolize
+    ? buildOpeningSymbols(drawable, { cutY: position, plane: config.plane, openings: options.openings, storeyElements: options.storeyElements })
+    : [];
+  const symbolized = new Set(symbols.map((s) => makeEntityKey(s.modelIndex, s.entityId)));
+  const fabric = drawable.filter((m) => !symbolized.has(makeEntityKey(m.modelIndex ?? 0, m.expressId)));
 
   const generator = new Drawing2DGenerator();
   let drawing: Drawing2D;
@@ -78,9 +82,6 @@ export async function generateStoreyPlan(meshes: readonly MeshData[], options: S
     generator.dispose();
   }
 
-  const symbols: PlanSymbol[] = symbolize
-    ? buildOpeningSymbols(drawable, { cutY: position, plane: config.plane, openings: options.openings, storeyElements: options.storeyElements })
-    : [];
   const labels: PlanLabel[] = [];
   if (options.spaces) {
     const spaces = selectDrawableMeshes(meshes, { includeTypes: ['IfcSpace'] });

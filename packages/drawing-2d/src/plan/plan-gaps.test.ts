@@ -12,7 +12,7 @@ import type { MeshData } from '@ifc-lite/geometry';
 import { boxTriangles, placeWorldFrame, asMeshData } from '@ifc-lite/world-frame-fixtures';
 import { generateFloorPlan, Drawing2DGenerator, createSectionConfig } from '../drawing-generator.js';
 import { exportToSVG } from '../svg-exporter.js';
-import type { DoorSwingParameters, Drawing2D } from '../types.js';
+import { makeEntityKey, type DoorSwingParameters, type Drawing2D } from '../types.js';
 import {
   PLAN_ELEMENT_FILTER,
   classifyMaterialName,
@@ -189,7 +189,7 @@ describe('goal 4: doors and windows draw as plan symbols', () => {
     const drawing = await generateStoreyPlan(meshes, {
       storeyElevation: 0,
       generator: fast,
-      openings: new Map([[20, { operationType: 'SINGLE_SWING_LEFT' }], [21, { operationType: '.SINGLE_SWING_RIGHT.' }]]),
+      openings: new Map([[makeEntityKey(0, 20), { operationType: 'SINGLE_SWING_LEFT' }], [makeEntityKey(0, 21), { operationType: '.SINGLE_SWING_RIGHT.' }]]),
     });
     const doors = drawing.planSymbols?.filter((s) => s.kind === 'door') ?? [];
     expect(doors.map((s) => s.entityId).sort()).toEqual([20, 21]);
@@ -213,7 +213,7 @@ describe('goal 4: doors and windows draw as plan symbols', () => {
     const drawing = await generateStoreyPlan([host, ...door(20, [1, 0, 0], 1.0)], {
       storeyElevation: 0,
       generator: fast,
-      openings: new Map([[20, { width: 0.885 }]]),
+      openings: new Map([[makeEntityKey(0, 20), { width: 0.885 }]]),
     });
     const params = drawing.planSymbols?.find((s) => s.entityId === 20)?.symbol?.parameters as DoorSwingParameters;
     expect(params.width).toBeCloseTo(0.885, 6);
@@ -229,6 +229,30 @@ describe('goal 4: doors and windows draw as plan symbols', () => {
     expect(windows.map((s) => s.entityId)).toEqual([30]);
     expect(windows[0].lines.length).toBeGreaterThanOrEqual(3);
     expect(exportToSVG(drawing)).toMatch(/id="plan-symbols"/);
+  });
+
+  it('keeps the projection linework of a window that does not cross the cut', async () => {
+    const low = box(30, 'IfcWindow', [4.5, 0.2, -0.1], [5.5, 1.0, 0]);
+    const drawing = await generateStoreyPlan([host, low], { storeyElevation: 0, generator: fast });
+    expect(drawing.planSymbols?.filter((s) => s.kind === 'window')).toEqual([]);
+    expect(drawing.lines.filter((l) => l.entityId === 30 && l.category === 'projection').length).toBeGreaterThan(0);
+  });
+
+  it('reads the opening info of each federated model separately', async () => {
+    const second = door(20, [3, 0, 0]).map((m) => ({ ...m, modelIndex: 1 }));
+    const drawing = await generateStoreyPlan([host, ...door(20, [1, 0, 0]), ...second], {
+      storeyElevation: 0,
+      generator: fast,
+      openings: new Map([
+        [makeEntityKey(0, 20), { operationType: 'SINGLE_SWING_LEFT' }],
+        [makeEntityKey(1, 20), { operationType: 'SINGLE_SWING_RIGHT', width: 0.85 }],
+      ]),
+    });
+    const swing = (modelIndex: number) => drawing.planSymbols?.find((s) => s.entityId === 20 && s.modelIndex === modelIndex)?.symbol?.parameters as DoorSwingParameters;
+    expect(swing(0).hingePoint.x).toBeCloseTo(1, 5);
+    expect(swing(0).width).toBeCloseTo(0.9, 5);
+    expect(swing(1).hingePoint.x).toBeGreaterThan(3.45);
+    expect(swing(1).width).toBeCloseTo(0.85, 6);
   });
 });
 

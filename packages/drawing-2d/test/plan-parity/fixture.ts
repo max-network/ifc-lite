@@ -12,6 +12,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { GeometryProcessor, type CoordinateInfo, type MeshData } from '@ifc-lite/geometry';
 import { IfcParser, effectiveMetadataRecord, extractMaterialsOnDemand, type IfcDataStore } from '@ifc-lite/parser';
 import { RelationshipType, type SpatialNode } from '@ifc-lite/data';
+import { makeEntityKey, type EntityKey } from '../../src/index.js';
 
 export const WASM_PATH = new URL('../../../wasm/pkg/ifc-lite_bg.wasm', import.meta.url);
 export const wasmAvailable = existsSync(WASM_PATH);
@@ -36,7 +37,7 @@ export interface PlanFixture {
   frame: CoordinateInfo;
   storeys: FixtureStorey[];
   ifcTypeOf: ReadonlyMap<number, string>;
-  openings: Map<number, FixtureOpening>;
+  openings: Map<EntityKey, FixtureOpening>;
   spaceLabels: Map<number, string>;
   /** Material name per element id and per `IfcMaterial` id a mesh slices. */
   materialNames: Map<number, string>;
@@ -129,13 +130,13 @@ export async function loadPlanFixture(name: string, path: string): Promise<PlanF
 
   const ifcTypeOf = new Map<number, string>();
   for (const mesh of meshes) if (mesh.ifcType) ifcTypeOf.set(mesh.expressId, mesh.ifcType);
-  const openings = new Map<number, FixtureOpening>();
+  const openings = new Map<EntityKey, FixtureOpening>();
   const spaceLabels = new Map<number, string>();
   const materialNames = new Map<number, string>();
   for (const [id, type] of ifcTypeOf) {
     const lower = type.toLowerCase();
     if (lower.startsWith('ifcdoor') || lower.startsWith('ifcwindow')) {
-      if (!lower.endsWith('type')) openings.set(id, readOpening(store, id, lower.startsWith('ifcdoor')));
+      if (!lower.endsWith('type')) openings.set(makeEntityKey(0, id), readOpening(store, id, lower.startsWith('ifcdoor')));
     } else if (lower === 'ifcspace') {
       const label = text(attribute(store, id, 'LongName')) ?? text(attribute(store, id, 'Name'));
       if (label) spaceLabels.set(id, label);
