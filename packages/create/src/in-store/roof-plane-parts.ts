@@ -132,8 +132,10 @@ export function writeRoofPlaneParts(editor: StoreEditor, anchor: MeasureAnchor, 
   const { length, area: areaScale, volume: volumeScale, angle: angleScale } = roofMeasureScales(anchor);
   const voided = new Set<number>();
   for (const id of reader.ids('IFCRELVOIDSELEMENT')) {
-    const host = refId(reader.entity(id)?.attributes[4]);
-    if (host !== null) voided.add(host);
+    const rel = reader.entity(id);
+    const host = refId(rel?.attributes[4]);
+    const opening = refId(rel?.attributes[5]);
+    if (host !== null && (opening === null || reader.entity(opening) !== null)) voided.add(host);
   }
   let unknownNet = voided.has(roofId);
   const planes = plan.planes.length ? plan.planes : [{ edge: -1, stage: 0, slope: 0, outline: plan.eaves }];

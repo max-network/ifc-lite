@@ -53,9 +53,11 @@ import {
   type OpeningInStoreParams,
   type WallJoinApplyOptions,
   addStairToStore,
+  addSpiralStairToStore,
   addRailingToStore,
   resolveSpatialAnchor,
   type StairInStoreParams,
+  type SpiralStairInStoreParams,
   type RailingInStoreParams,
   removeStairInStore,
   replaceElementInStore,
@@ -179,6 +181,13 @@ export function createModellingStoreBackendWithoutStoreys(resolve: ModellingStor
     addStair(modelId: string, storeyExpressId: number, params: StairInStoreParams): EntityRef {
       const model = resolve(modelId);
       const built = model.editor.runAtomic(draft => addStairToStore(
+        draft, { ...resolveSpatialAnchor(model.store, storeyExpressId, draft.getMutationView()), guidRandom: model.guidRandom }, params,
+      ));
+      return ref(model.modelId, built.stairId);
+    },
+    addSpiralStair(modelId: string, storeyExpressId: number, params: SpiralStairInStoreParams): EntityRef {
+      const model = resolve(modelId);
+      const built = model.editor.runAtomic(draft => addSpiralStairToStore(
         draft, { ...resolveSpatialAnchor(model.store, storeyExpressId, draft.getMutationView()), guidRandom: model.guidRandom }, params,
       ));
       return ref(model.modelId, built.stairId);

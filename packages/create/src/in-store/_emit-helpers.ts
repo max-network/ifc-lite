@@ -145,8 +145,8 @@ export function emitPolygonProfile(
  * Emit an IfcExtrudedAreaSolid extruding `profileId` along local +Z
  * for `depth` metres. Standard prologue for any swept-solid element.
  */
-export function emitExtrudedSolid(editor: StoreEditor, profileId: number, depth: number): number {
-  const originPt = editor.addEntity('IfcCartesianPoint', [[0, 0, 0]]).expressId;
+export function emitExtrudedSolid(editor: StoreEditor, profileId: number, depth: number, origin: [number, number, number] = [0, 0, 0]): number {
+  const originPt = editor.addEntity('IfcCartesianPoint', [origin]).expressId;
   const axis = editor.addEntity('IfcAxis2Placement3D', [`#${originPt}`, null, null]).expressId;
   const direction = editor.addEntity('IfcDirection', [[0, 0, 1]]).expressId;
   return editor.addEntity('IfcExtrudedAreaSolid', [

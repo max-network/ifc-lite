@@ -114,6 +114,11 @@ export function createRecordedModellingBackend(resolve: ModellingStoreModelResol
       if (!create) throw new Error('bim.store.addStair is not supported by this backend');
       return create(...args);
     }),
+    addSpiralStair: (...args: Parameters<NonNullable<Methods['addSpiralStair']>>) => record(args[0], methods => {
+      const create = methods.addSpiralStair;
+      if (!create) throw new Error('bim.store.addSpiralStair is not supported by this backend');
+      return create(...args);
+    }),
     addRailing: (...args: Parameters<NonNullable<Methods['addRailing']>>) => record(args[0], methods => {
       const create = methods.addRailing;
       if (!create) throw new Error('bim.store.addRailing is not supported by this backend');
