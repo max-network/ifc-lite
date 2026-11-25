@@ -59,14 +59,16 @@ export function parseCorridorDefinition(text: unknown): CorridorDefinition | nul
   const centreline = all(parsed.Centreline, point);
   const profile = all(parsed.Profile, pvi);
   const radiiReadable = parsed.Radii === undefined || (Array.isArray(parsed.Radii) && parsed.Radii.every((r) => r === null || isNumber(r)));
+  const transitionsReadable = parsed.Transitions === undefined || (Array.isArray(parsed.Transitions) && parsed.Transitions.every((r) => r === null || isNumber(r)));
   const kerbs = kerb(parsed.Kerb);
   const tolerance = optionalNumber(parsed.Tolerance);
   const { Width, CrossFall, CrossFallSide, MaxGrade, MinK } = parsed;
-  if (!centreline || !profile || !radiiReadable || kerbs === null || tolerance === null) return null;
+  if (!centreline || !profile || !radiiReadable || !transitionsReadable || kerbs === null || tolerance === null) return null;
   if (!isNumber(Width) || !isNumber(CrossFall) || !isSide(CrossFallSide) || !isNumber(MaxGrade) || !isNumber(MinK)) return null;
   return {
     Centreline: centreline,
     Radii: Array.isArray(parsed.Radii) ? parsed.Radii.map((r) => (isNumber(r) ? r : null)) : [],
+    ...(Array.isArray(parsed.Transitions) ? { Transitions: parsed.Transitions.map((r) => (isNumber(r) ? r : null)) } : {}),
     Width, CrossFall, CrossFallSide, Profile: profile, MaxGrade, MinK,
     ...(kerbs ? { Kerb: kerbs } : {}),
     ...(tolerance === undefined ? {} : { Tolerance: tolerance }),

@@ -40,8 +40,8 @@ function horizontalPieces(segments: readonly HorizontalSegment[], maxOffset: num
   return segments.map((segment) => {
     const from = start;
     start += segment.length;
-    const radius = Math.abs(segment.startRadius);
-    const step = segment.type === 'CIRCULARARC' && radius > 0 ? (t: number) => arcStep(radius + maxOffset, t) : () => Infinity;
+    const curvature = Math.max(Math.abs(segment.startCurvature), Math.abs(segment.endCurvature));
+    const step = segment.type !== 'LINE' && curvature > 0 ? (t: number) => arcStep(1 / curvature + maxOffset, t) : () => Infinity;
     return { from, to: start, step };
   });
 }

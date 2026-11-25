@@ -23,6 +23,7 @@ export interface CorridorDefinition {
   Centreline: readonly PlanXY[];
   /** One radius per interior centreline vertex; a missing one is the largest smooth arc that fits. */
   Radii?: readonly (number | null)[];
+  Transitions?: readonly (number | null)[];
   Width: number;
   CrossFall: number;
   CrossFallSide: CrossFallSide;
@@ -150,7 +151,7 @@ interface Assembled {
 function assemble(definition: CorridorDefinition): Assembled {
   const problems = definitionProblems(definition);
   const halfOuter = outerHalfWidth(definition);
-  const horizontal = centrelineSegments(definition.Centreline, definition.Radii ?? [], halfOuter);
+  const horizontal = centrelineSegments(definition.Centreline, definition.Radii ?? [], halfOuter, definition.Transitions ?? []);
   problems.push(...horizontal.problems);
   if (horizontal.problems.length === 0 && polylineSelfIntersects(definition.Centreline, false)) {
     problems.push({ code: 'self_intersecting', values: {} });

@@ -7,6 +7,7 @@ export type CorridorProblemCode =
   | 'centreline'
   | 'radius_too_large'
   | 'radius_below_half_width'
+  | 'transition_too_long'
   | 'self_intersecting'
   | 'station_outside'
   | 'stations_not_ascending'
