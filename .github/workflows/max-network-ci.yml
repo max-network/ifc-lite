@@ -23,11 +23,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/max-network-verify
 
-  # Committed generated output must equal a fresh run of its generator.
+  # Committed generated output must equal a fresh run of its generator, and unused locals stay at the baseline.
   generated:
     if: github.repository == 'max-network/ifc-lite'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
@@ -56,6 +56,13 @@ jobs:
             echo "::error::packages/validate/src/generated is stale. Run 'pnpm --filter @ifc-lite/validate generate' and commit the result."
             exit 1
           fi
+
+      # Compiles every workspace package against the dist built above.
+      - name: Check unused locals against the baseline
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: node scripts/check-unused-locals.mjs
 
       - name: Check the other generated outputs
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
