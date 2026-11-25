@@ -14,10 +14,13 @@ export { buildOpeningSymbols, isOpeningFillingType, type OpeningSymbolOptions } 
 export { buildSpaceAnnotations, type SpaceAnnotationOptions } from './space-annotations.js';
 export {
   classifyMaterialName,
+  roofingKindOf,
   resolveHatchPattern,
   MATERIAL_HATCH_PATTERNS,
+  MEMBRANE_HATCH_PATTERN,
   type MaterialCategory,
   type ResolvedHatch,
+  type RoofingKind,
 } from './material-hatch.js';
 export type { PlanSymbol, PlanSymbolKind, PlanLabel, PlanOpeningInfo, PlanAnnotations } from './plan-types.js';
 export * from './dimensions/index.js';

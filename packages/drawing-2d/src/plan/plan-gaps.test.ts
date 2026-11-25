@@ -12,12 +12,17 @@ import type { MeshData } from '@ifc-lite/geometry';
 import { boxTriangles, placeWorldFrame, asMeshData } from '@ifc-lite/world-frame-fixtures';
 import { generateFloorPlan, Drawing2DGenerator, createSectionConfig } from '../drawing-generator.js';
 import { exportToSVG } from '../svg-exporter.js';
-import { makeEntityKey, type DoorSwingParameters, type Drawing2D } from '../types.js';
+import { makeEntityKey, type DoorSwingParameters, type Drawing2D, type DrawingPolygon } from '../types.js';
 import {
   PLAN_ELEMENT_FILTER,
+  MATERIAL_HATCH_PATTERNS,
+  MEMBRANE_HATCH_PATTERN,
   classifyMaterialName,
   generateStoreyPlan,
+  resolveHatchPattern,
+  roofingKindOf,
   selectDrawableMeshes,
+  type MaterialCategory,
   storeyCutElevation,
 } from './index.js';
 
@@ -286,6 +291,22 @@ describe('goal 5: cut walls are hatched by material category', () => {
     expect(classifyMaterialName('Ziegel')).toBe('masonry');
     expect(classifyMaterialName('Concrete C25/30')).toBe('concrete');
     expect(classifyMaterialName('Dachdämmung Steinwolle')).toBe('insulation');
+  });
+
+  it('classifies roofing membranes as roofing, apart from the coverings by their kind and hatch', () => {
+    const membranes = ['Bitumen roofing membrane', 'Dachpappe', 'Bitumenbahn', 'Schweißbahn', 'roofing felt', 'EPDM', 'Kunststoffdachbahn',
+      "membrane d'étanchéité", 'papa asfáltica', 'Bitumen-Schweissbahn V60 S4', 'PVC roofing membrane', 'Dachabdichtung'];
+    for (const name of membranes) {
+      expect(classifyMaterialName(name), name).toBe('roofing');
+      expect(roofingKindOf(name), name).toBe('membrane');
+    }
+    for (const name of ['Clay roof tiles', 'Natural slate', 'Bitumen shingles']) expect(roofingKindOf(name), name).toBe('covering');
+    expect(roofingKindOf('Reinforced concrete')).toBeUndefined();
+    expect(classifyMaterialName('Asphalt')).toBeUndefined();
+    const polygon: DrawingPolygon = { polygon: { outer: [], holes: [] }, entityId: 7, materialId: 3, ifcType: 'IfcSlab', modelIndex: 0, isCut: true };
+    const categories = new Map<number, MaterialCategory>([[3, 'roofing']]);
+    expect(resolveHatchPattern(polygon, categories, new Set([3]))).toEqual({ pattern: MEMBRANE_HATCH_PATTERN, category: 'roofing' });
+    expect(resolveHatchPattern(polygon, categories).pattern).toEqual(MATERIAL_HATCH_PATTERNS.roofing);
   });
 
   it('switches the hatch pattern with the material category of the cut element', async () => {
