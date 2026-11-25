@@ -227,3 +227,33 @@ it('enumerates schema keys once per bulk session read, not per record #8452', ()
     expect(keys.mock.calls.filter(([object]) => object === entities).length).toBeLessThanOrEqual(4);
   } finally { keys.mockRestore(); }
 });
+
+describe('overlayFromView', () => {
+  const ifc = `ISO-10303-21;
+HEADER;FILE_SCHEMA(('IFC4'));ENDSEC;
+DATA;
+#1=IFCPROJECT('0000000000000000000001',$,'Project',$,$,$,$,$,$);
+#3=IFCWALL('0000000000000000000003',$,'Replacement',$,$,$,$,$,$);
+#12=IFCWALL('0000000000000000000012',$,'Original',$,$,$,$,$,$);
+#13=IFCRELAGGREGATES('0000000000000000000013',$,$,$,#1,(#12));
+ENDSEC;END-ISO-10303-21;`;
+
+  it('serves one overlay between edits and a fresh one after each edit', async () => {
+    const store = await new IfcParser().parseColumnar(new TextEncoder().encode(ifc).buffer as ArrayBuffer);
+    const view = new MutablePropertyView(null, 'cached');
+    view.setPositionalAttribute(13, 5, ['#3'], true);
+    const first = overlayFromView(view, store);
+    expect(overlayFromView(view, store)).toBe(first);
+    expect(first?.relationshipEdges(1, 'IfcRelAggregates').map(edge => edge.targetId)).toEqual([3]);
+
+    view.setPositionalAttribute(13, 5, ['#3', '#12'], true);
+    const second = overlayFromView(view, store);
+    expect(second).not.toBe(first);
+    expect(second?.relationshipEdges(1, 'IfcRelAggregates').map(edge => edge.targetId).sort((a, b) => a - b)).toEqual([3, 12]);
+
+    const point = view.createEntity('IfcCartesianPoint', [[0, 0, 0]]);
+    expect(overlayFromView(view, store)?.createdAll.map(entity => entity.expressId)).toContain(point.expressId);
+    view.deleteEntity(point.expressId);
+    expect(overlayFromView(view, store)?.createdAll.map(entity => entity.expressId)).not.toContain(point.expressId);
+  });
+});

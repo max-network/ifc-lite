@@ -127,6 +127,7 @@ export interface PendingOverlay {
 export function pendingOverlay(model: { backend: { pendingOverlay(): PendingOverlay | null } }): PendingOverlay | null {
   return model.backend.pendingOverlay();
 }
+const overlaysByView = new WeakMap<MutablePropertyView, { store: IfcDataStore; revision: number; overlay: ViewOverlay }>();
 /**
  * The same reader, built from the view directly.
  *
@@ -136,25 +137,19 @@ export function pendingOverlay(model: { backend: { pendingOverlay(): PendingOver
  */
 export function overlayFromView(view: MutablePropertyView | null, store: IfcDataStore): PendingOverlay | null {
   if (!view || !view.hasPendingChanges()) return null;
-  return new ViewOverlay(view, store);
+  const revision = view.getMutationRevision();
+  const cached = overlaysByView.get(view);
+  if (cached && cached.store === store && cached.revision === revision) return cached.overlay;
+  const overlay = new ViewOverlay(view, store);
+  overlaysByView.set(view, { store, revision, overlay });
+  return overlay;
 }
 /**
  * **Everything derived is lazy, and the point lookup does not derive at all.**
  *
- * A fresh `ViewOverlay` is built on every overlay read — that is what keeps it
- * honest, because there is no revision counter on `MutablePropertyView` to cache
- * against and `getMutations().length` is not one (`mutation_undo` splices the
- * history, so a later write can land back on the same length). A stale overlay
- * after a mutation is a correctness bug; rebuilding is not.
- *
- * So the rebuild is made cheap instead. The constructor does no work, each
- * derived collection is computed once per instance on first use, and
- * `createdEntity` — the one called per entity by `entityData` — goes straight to
- * the view's own id map rather than materialising the whole created list.
- * Measured on a 20k-wall model with 2,000 queued creates, a 1,000-id
- * `get_entities_bulk` went from ~1,960ms to ~7ms (median of five), and
- * `getMutations()` (which copies the whole history) is no longer touched unless
- * a payload reports the count.
+ * One `ViewOverlay` serves every read until the view's mutation revision moves,
+ * so a run of relationship reads between two edits resolves the relationship
+ * overlay once instead of once per read.
  */
 class ViewOverlay implements PendingOverlay {
   private readonly view: MutablePropertyView;
