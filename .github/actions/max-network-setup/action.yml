@@ -27,12 +27,42 @@ runs:
           echo "built=true" >> "$GITHUB_OUTPUT"
         fi
 
-    - name: Set up the wasm toolchain
+    # The org allows only GitHub-owned actions, so this mirrors setup-wasm-build with actions/cache.
+    - name: Install the pinned Rust toolchain
       if: steps.fetch-wasm.outputs.built == 'true'
-      uses: ./.github/actions/setup-wasm-build
+      shell: bash
+      run: rustup show
+
+    - name: Cargo cache
+      if: steps.fetch-wasm.outputs.built == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        cache-prefix: max-network
-        save-if: ${{ github.ref == 'refs/heads/max-network/main' }}
+        path: |
+          ~/.cargo/registry/index
+          ~/.cargo/registry/cache
+          ~/.cargo/git/db
+          target
+        key: max-network-wasm-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+        restore-keys: max-network-wasm-${{ runner.os }}-
+
+    - name: Install wasm-pack
+      if: steps.fetch-wasm.outputs.built == 'true'
+      shell: bash
+      env:
+        WASM_PACK_VERSION: v0.15.0
+        WASM_PACK_SHA256: c09f971ecaed9a2efc80fdcea7a00ef6b53c7fadc8c57d1f61b53a6aa66b668a
+      run: |
+        set -euo pipefail
+        name="wasm-pack-${WASM_PACK_VERSION}-x86_64-unknown-linux-musl"
+        dest="${RUNNER_TEMP}/wasm-pack"
+        mkdir -p "$dest"
+        curl --fail --silent --show-error --location --retry 8 --retry-delay 5 --retry-all-errors \
+          --output "$dest/${name}.tar.gz" "https://github.com/wasm-bindgen/wasm-pack/releases/download/${WASM_PACK_VERSION}/${name}.tar.gz"
+        echo "${WASM_PACK_SHA256}  $dest/${name}.tar.gz" | sha256sum --check --strict
+        tar -xzf "$dest/${name}.tar.gz" -C "$dest" --strip-components=1 "${name}/wasm-pack"
+        rm -f "$dest/${name}.tar.gz"
+        "$dest/wasm-pack" --version
+        echo "$dest" >> "$GITHUB_PATH"
 
     - name: Build the wasm from source
       if: steps.fetch-wasm.outputs.built == 'true'
