@@ -32,7 +32,7 @@ describe('addFlowPathElementToStore', () => {
     const { editor, anchor, entity, ref } = setup();
     const r = addFlowPathElementToStore(editor, anchor, {
       Type: 'IfcPipeSegment', PredefinedType: 'RIGIDSEGMENT', Name: 'Pipe', Path: [[1, 2, 0.5], [4, 2, 0.5]], OuterDiameter: 0.022, InnerDiameter: 0.02,
-      SystemType: 'DOMESTICCOLDWATER', FlowDirections: ['SINK', 'SOURCE'],
+      SystemType: 'DOMESTICCOLDWATER', FlowDirections: ['SINK', 'SOURCE'], PortNames: ['In', 'Out'],
     });
     const pipe = entity(r.elementId);
     expect(pipe.type).toBe('IfcPipeSegment');
@@ -46,6 +46,7 @@ describe('addFlowPathElementToStore', () => {
     expect(r.portIds).toHaveLength(2);
     const [start, end] = r.portIds.map(entity);
     expect(start.type).toBe('IfcDistributionPort');
+    expect([start.attributes[2], end.attributes[2]]).toEqual(['In', 'Out']);
     expect(start.attributes.slice(7)).toEqual(['.SINK.', '.PIPE.', '.DOMESTICCOLDWATER.']);
     expect(end.attributes.slice(7)).toEqual(['.SOURCE.', '.PIPE.', '.DOMESTICCOLDWATER.']);
     const endPlacement = ref(end.attributes[5]);

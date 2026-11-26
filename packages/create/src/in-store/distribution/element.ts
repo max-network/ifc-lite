@@ -26,6 +26,7 @@ export interface FlowPathElementInStoreParams extends DistributionElementHeader 
   PortType?: string;
   SystemType?: string;
   FlowDirections?: readonly [PortFlowDirection, PortFlowDirection];
+  PortNames?: readonly [string, string];
   Ports?: boolean;
 }
 
@@ -137,6 +138,7 @@ export function addFlowPathElementToStore(editor: StoreEditor, anchor: SpatialAn
   const body = emitBody(editor, anchor, 'AdvancedSweptSolid', [solid]);
   const last = local.length - 1;
   const [startFlow, endFlow] = params.FlowDirections ?? ['NOTDEFINED', 'NOTDEFINED'];
+  const [startName, endName] = params.PortNames ?? ['Start', 'End'];
   const port = (at: Vec3, toward: Vec3, flow: PortFlowDirection, name: string): DistributionPortParams => ({
     Location: at,
     Direction: sub(at, toward),
@@ -145,7 +147,7 @@ export function addFlowPathElementToStore(editor: StoreEditor, anchor: SpatialAn
     SystemType: params.SystemType,
     Name: name,
   });
-  const ports = params.Ports === false ? [] : [port(local[0], local[1], startFlow, 'Start'), port(local[last], local[last - 1], endFlow, 'End')];
+  const ports = params.Ports === false ? [] : [port(local[0], local[1], startFlow, startName), port(local[last], local[last - 1], endFlow, endName)];
   return emitElement(editor, anchor, params, checked, placementId, body, ports, op);
 }
 
