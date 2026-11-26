@@ -34,6 +34,8 @@ import type { IfcDataStore } from '@ifc-lite/parser';
 import type { MutablePropertyView, StoreEditor } from '@ifc-lite/mutations';
 import { PART_TYPE } from '../roof-plane-parts.js';
 import { ROOF_FOOTPRINT_PSET } from '../roof-footprint.js';
+import { AnchorEntityReader } from '../resolve-anchor.js';
+import { isRoofClipped, wallBaseSolid } from './wall-base-solid.js';
 import {
   asExpressIdRef,
   asCoordinateTriple,
@@ -260,7 +262,7 @@ export function resolveSlabEditChain(
   if (!shapeRepAttrs) return null;
   const items = shapeRepAttrs[3];
   if (!Array.isArray(items) || items.length === 0) return null;
-  const solidId = bodyItemId ?? asExpressIdRef(items[0]);
+  const solidId = bodyItemId ?? wallBaseSolid(new AnchorEntityReader(dataStore, view), isRoofClipped(dataStore, view, expressId), asExpressIdRef(items[0]));
   if (solidId === null) return null;
   if (editor.getEntityType(solidId)?.toUpperCase() !== 'IFCEXTRUDEDAREASOLID') return null;
   const solidAttrs = readAttributes(dataStore, view, editor, solidId);

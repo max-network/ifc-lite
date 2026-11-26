@@ -139,7 +139,8 @@ export {
   planFootprintRoof, heightAt as roofPlaneHeightAt, roofPlaneTag,
   type FootprintRoofPlan, type RoofEdgeBreak, type RoofPlane, type RoofShapeType,
 } from './roof-footprint-plan.js';
-export { readRoofClippedWallTop, type WallTopPoint } from './wall-roof-clip.js';
+export { clearBodyRoofClipInStore, clipBodyToRoofInStore, readRoofClippedWallTop, type WallTopPoint } from './wall-roof-clip.js';
+export { ROOF_ATTACHMENT } from './edit/wall-base-solid.js';
 export { addVaultToStore, editVaultInStore, readVaultInStore, type VaultEdit, type VaultInStore, type VaultInStoreParams } from './vault/vault.js';
 export { VAULT_PSET, type VaultShape, type VaultSpanAxis } from './vault/vault-definition.js';
 export { vaultPlanLines, type PlanSegment, type VaultPlanFrame, type VaultPlanLines } from './vault/vault-plan.js';

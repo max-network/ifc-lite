@@ -179,6 +179,23 @@ function open(ring: Vec2[]): Vec2[] {
   return ring.length > 3 && Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(a[1] - b[1]) < 1e-9 ? ring.slice(0, -1) : ring;
 }
 
+const DIFFERENCE_RESULTS = new Set(['ifcbooleanresult', 'ifcbooleanclippingresult']);
+
+/** A body item, or the first operand beneath its chain of differences, which bounds it in plan. */
+function differenceBase(store: IfcDataStore, extractor: EntityExtractor, overlay: OverlayWallReader | undefined, start: number | null): { item: Entity; type: string } | null {
+  const seen = new Set<number>();
+  for (let id = start; id !== null && !seen.has(id);) {
+    seen.add(id);
+    const item = readEntity(store, extractor, overlay, id);
+    if (!item) return null;
+    const type = resolveEntityTypeName(store, item, id);
+    if (!DIFFERENCE_RESULTS.has(type)) return { item, type };
+    if (String(item.attributes[0] ?? '').replace(/\./g, '').toUpperCase() !== 'DIFFERENCE') return null;
+    id = numericAttr(item.attributes[1]);
+  }
+  return null;
+}
+
 /**
  * The plan footprint RING of a product's body (rep frame, native units): the
  * largest ring over its body items. Null when no item gives one.
@@ -196,10 +213,9 @@ export function bodyFootprintRing(
     const rep = repId === null ? null : readEntity(store, extractor, overlay, repId);
     if (!rep || String(rep.attributes[1] ?? '').replace(/'/g, '').toLowerCase() === 'axis') continue;
     for (const itemRef of list(rep.attributes[3])) {
-      const itemId = numericAttr(itemRef);
-      const item = itemId === null ? null : readEntity(store, extractor, overlay, itemId);
-      if (!item || itemId === null) continue;
-      const type = resolveEntityTypeName(store, item, itemId);
+      const base = differenceBase(store, extractor, overlay, numericAttr(itemRef));
+      if (!base) continue;
+      const { item, type } = base;
       let ring: Vec2[] | null = null;
       if (type === 'ifcextrudedareasolid') {
         const pts: Vec2[] = [];
