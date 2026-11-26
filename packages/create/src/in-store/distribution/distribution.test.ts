@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { MutablePropertyView, StoreEditor, type MutationEntityRef, type MutationStoreShape } from '@ifc-lite/mutations';
 import type { SpatialAnchor, SpatialAnchorSchema } from '../anchor.js';
-import { addDistributionElementToStore, addFlowPathElementToStore } from './element.js';
+import { addDistributionElementToStore, addFlowPathElementToStore, emitRectangularSweep } from './element.js';
 import { connectPortsInStore } from './ports.js';
 import { addDistributionSystemToStore, assignToGroupInStore } from './system.js';
 
@@ -77,6 +77,49 @@ describe('addFlowPathElementToStore', () => {
     expect(() => addFlowPathElementToStore(editor, anchor, { Type: 'IfcPipeSegment', Path: [[0, 0, 0], [1, 0, 0]], OuterDiameter: 0.02, InnerDiameter: 0.03 })).toThrow(/InnerDiameter/);
     expect(() => addFlowPathElementToStore(editor, anchor, { Type: 'IfcPipeSegment', PredefinedType: 'BEND', Path: [[0, 0, 0], [1, 0, 0]], OuterDiameter: 0.02 })).toThrow(/PredefinedType/);
     expect(() => addFlowPathElementToStore(setup('IFC2X3').editor, setup('IFC2X3').anchor, { Type: 'IfcPipeSegment', Path: [[0, 0, 0], [1, 0, 0]], OuterDiameter: 0.02 })).toThrow(/IFC4 or later/);
+  });
+});
+
+describe('rectangular flow path elements', () => {
+  it('extrudes a rectangle along each path segment with the width kept horizontal', () => {
+    const { editor, anchor, entity, ref } = setup('IFC4X3', 0.001);
+    const r = addFlowPathElementToStore(editor, anchor, {
+      Type: 'IfcDuctSegment', PredefinedType: 'RIGIDSEGMENT', Path: [[0, 0, 0], [2, 0, 0], [2, 0, 1]], Section: { Width: 0.2, Height: 0.05 },
+      PortType: 'DUCT', SystemType: 'VENTILATION', FlowDirections: ['SINK', 'SOURCE'],
+    });
+    const rep = entity(r.shapeRepId);
+    expect(rep.attributes[2]).toBe('SweptSolid');
+    const [flat, riser] = listOf(rep.attributes[3]).map(ref);
+    expect(flat.type).toBe('IfcExtrudedAreaSolid');
+    expect(flat.attributes[3]).toBe(2000);
+    const profile = ref(flat.attributes[0]);
+    expect(profile.type).toBe('IfcRectangleProfileDef');
+    expect(profile.attributes.slice(3)).toEqual([200, 50]);
+    const flatAxes = ref(flat.attributes[1]);
+    expect(ref(flatAxes.attributes[1]).attributes[0]).toEqual([1, 0, 0]);
+    expect(ref(flatAxes.attributes[2]).attributes[0]).toEqual([0, 1, 0]);
+    const riserAxes = ref(riser.attributes[1]);
+    expect(ref(riserAxes.attributes[0]).attributes[0]).toEqual([2000, 0, 0]);
+    expect(ref(riserAxes.attributes[1]).attributes[0]).toEqual([0, 0, 1]);
+    expect(ref(riserAxes.attributes[2]).attributes[0]).toEqual([1, 0, 0]);
+    expect(entity(r.portIds[1] ?? -1).attributes.slice(7)).toEqual(['.SOURCE.', '.DUCT.', '.VENTILATION.']);
+  });
+
+  it('writes a hollow section and exports the sweep for other products', () => {
+    const { editor, anchor, entity, ref } = setup();
+    const r = addFlowPathElementToStore(editor, anchor, { Type: 'IfcDuctFitting', PredefinedType: 'BEND', Path: [[0, 0, 0], [0, 1, 0]], Section: { Width: 0.2, Height: 0.1, WallThickness: 0.001 }, Ports: false });
+    const solid = ref(listOf(entity(r.shapeRepId).attributes[3])[0]);
+    expect(ref(solid.attributes[0]).type).toBe('IfcRectangleHollowProfileDef');
+    const ids = emitRectangularSweep(editor, anchor, [[0, 0, 0], [1, 0, 0], [1, 1, 0]], { Width: 0.3, Height: 0.1 });
+    expect(ids.map((id) => entity(id).type)).toEqual(['IfcExtrudedAreaSolid', 'IfcExtrudedAreaSolid']);
+  });
+
+  it('refuses both or neither of a diameter and a section, and a wall that leaves no bore', () => {
+    const { editor, anchor } = setup();
+    expect(() => addFlowPathElementToStore(editor, anchor, { Type: 'IfcDuctSegment', Path: [[0, 0, 0], [1, 0, 0]] })).toThrow(/OuterDiameter or Section/);
+    expect(() => addFlowPathElementToStore(editor, anchor, { Type: 'IfcDuctSegment', Path: [[0, 0, 0], [1, 0, 0]], OuterDiameter: 0.1, Section: { Width: 0.1, Height: 0.1 } })).toThrow(/OuterDiameter or Section/);
+    expect(() => addFlowPathElementToStore(editor, anchor, { Type: 'IfcDuctSegment', Path: [[0, 0, 0], [1, 0, 0]], Section: { Width: 0.1, Height: 0.04, WallThickness: 0.02 } })).toThrow(/WallThickness/);
+    expect(() => addFlowPathElementToStore(editor, anchor, { Type: 'IfcDuctSegment', Path: [[0, 0, 0], [1, 0, 0]], Section: { Width: 0, Height: 0.04 } })).toThrow(/Width and Height/);
   });
 });
 
