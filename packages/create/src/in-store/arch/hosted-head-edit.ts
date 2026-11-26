@@ -12,7 +12,7 @@ import { retireProductShape } from '../product-shape-retire.js';
 import { AnchorEntityReader } from '../resolve-anchor.js';
 import { localBodyExtent } from '../resolve-host.js';
 import type { HostedFillRead } from '../hosted-fill-read.js';
-import { archedOpeningPath } from './arched-outline.js';
+import { nativeArchedOpeningPath } from './arched-outline.js';
 import { headRise, type OpeningHead } from './opening-head.js';
 import { emitPathProfile } from './profile-path.js';
 
@@ -75,11 +75,11 @@ export function rebuildHostedHead(store: IfcDataStore, editor: StoreEditor, host
   }
   const width = toNativeLength(host, next.width);
   const height = toNativeLength(host, next.height);
-  const rise = next.head ? toNativeLength(host, headRise(next.head, next.width, next.height, 'editHostedElementInStore')) : null;
+  const rise = next.head ? headRise(next.head, next.width, next.height, 'editHostedElementInStore') : null;
   const opening = bodyOf(reader, read.openingId);
   const profile = rise === null
     ? emitRectangleProfile(editor, width, height, 0, height / 2)
-    : emitPathProfile(editor, host.schema, archedOpeningPath({ width, height, rise }));
+    : emitPathProfile(editor, host.schema, nativeArchedOpeningPath(host, { width: next.width, height: next.height, rise }));
   const solid = emitExtrudedSolid(editor, profile, local.max[2] - local.min[2]);
   replaceShape(store, editor, read.openingId, opening.shapeId, emitBodyRepresentation(editor, opening.contextId, solid).productShapeId);
   if (read.fillingId === null) return;
