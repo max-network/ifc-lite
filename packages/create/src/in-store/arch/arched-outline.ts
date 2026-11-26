@@ -3,7 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { ARC_CHORD_TOLERANCE, KERNEL_MIN_ARC_CHORDS, archArcs, archHeightAt, archShape, type ArchShape } from './arch-shape.js';
-import { linePath, withoutRepeats, type PathSegment, type ProfilePath } from './profile-path.js';
+import { toNativeLength, type HostAnchor } from '../anchor.js';
+import { linePath, scalePath, withoutRepeats, type PathSegment, type ProfilePath } from './profile-path.js';
 
 export interface ArchedHead {
   readonly width: number;
@@ -43,6 +44,11 @@ export function archedOpeningPath(head: ArchedHead): ProfilePath {
       ...innerArc(head, 0, half, -half),
     ],
   });
+}
+
+/** The outline of an arched opening sized in metres, drawn in metres so the arc tolerance holds, then scaled to the host's length unit. */
+export function nativeArchedOpeningPath(host: Pick<HostAnchor, 'lengthUnitScale'>, head: ArchedHead): ProfilePath {
+  return scalePath(archedOpeningPath(head), (value) => toNativeLength(host, value));
 }
 
 function innerArc(head: ArchedHead, inset: number, fromX: number, toX: number): PathSegment[] {

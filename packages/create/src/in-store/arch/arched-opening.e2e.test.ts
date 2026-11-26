@@ -18,8 +18,8 @@ import { readOpeningHead } from './opening-head.js';
 
 type Schema = 'IFC2X3' | 'IFC4' | 'IFC4X3';
 
-async function model(schema: Schema = 'IFC4') {
-  const creator = new IfcCreator({ Schema: schema, Timestamp: 0 });
+async function model(schema: Schema = 'IFC4', lengthUnit: 'METRE' | 'MILLIMETRE' = 'METRE') {
+  const creator = new IfcCreator({ Schema: schema, Timestamp: 0, LengthUnit: lengthUnit });
   const storey = creator.addIfcBuildingStorey({ Name: 'UG1', Elevation: 0 });
   const store = await new IfcParser().parseColumnar(new TextEncoder().encode(creator.toIfc().content).buffer, { disableWorkerScan: true });
   const view = new MutablePropertyView(null, 'm');
@@ -82,6 +82,19 @@ describe('arched openings', () => {
     editHostedElementInStore(m.store, m.editor, window.expressId, { Head: { Shape: 'segmental', Rise: 0.3 } });
     expect(readOpeningHead(m.store, window.openingId, m.view)?.rise).toBeCloseTo(0.3, 9);
     expect(readHostedFill(m.store, window.expressId, m.view)?.offset).toBeCloseTo(2, 9);
+  });
+
+  it('draws an arched opening with the same arcs in a millimetre model as in a metre model', async () => {
+    const arcs = async (unit: 'METRE' | 'MILLIMETRE') => {
+      const m = await model('IFC4', unit);
+      const window = addHostedElementInStore(m.store, m.editor, m.wall, { kind: 'window', params: ROUND_WINDOW });
+      expect(readOpeningHead(m.store, window.openingId, m.view)?.head).toEqual({ Shape: 'round' });
+      const curves = m.text().split('\n').filter((line) => line.includes('IFCINDEXEDPOLYCURVE'));
+      return Math.max(...curves.map((curve) => (curve.match(/IFCARCINDEX/g) ?? []).length));
+    };
+    const metre = await arcs('METRE');
+    expect(metre).toBeGreaterThan(0);
+    expect(await arcs('MILLIMETRE')).toBe(metre);
   });
 
   it('writes a parseable IFC2X3 arched opening as a polyline', async () => {
