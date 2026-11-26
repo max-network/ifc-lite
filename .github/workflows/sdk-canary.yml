@@ -27,6 +27,7 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - 'packages/a2ui/**'
       - 'packages/ai/**'
       - 'packages/bcf/**'
       - 'packages/bcf-api/**'
@@ -46,6 +47,7 @@ on:
       - 'packages/flow/**'
       - 'packages/flow-nodes/**'
       - 'packages/geometry/**'
+      - 'packages/georef-check/**'
       - 'packages/geo/**'
       - 'packages/geodata-ch/**'
       - 'packages/ids/**'

@@ -7,6 +7,7 @@ import type { StoreApi } from 'zustand';
 import type { ViewerState } from '@/store';
 import { hasAppearanceHistoryEntry } from '@/lib/appearance/history';
 import { applyRedoToView, applyUndoToView } from '@/store/slices/mutation-history-apply';
+import { leavesPartialPosition } from '@/lib/geo/complete-position';
 import { georefPatch } from '@/store/slices/mutation-history-replay';
 import { inverseMutationTargets, revertedMutationIds } from '@/store/slices/mutation-inverse-registry';
 import { mutationPermissionForModels, type MutationDenialReason } from '@/store/mutation-permission';
@@ -58,6 +59,8 @@ function replayable(mutation: Mutation): boolean {
   }
 }
 
+class PartialPositionError extends Error {}
+
 function applyTarget(store: StoreApi<ViewerState>, mutation: Mutation, direction: 'undo' | 'redo'): void {
   if (georef(mutation)) {
     store.setState(state => georefPatch(state, mutation.modelId, mutation, direction));
@@ -81,9 +84,10 @@ export function revertChangeOperation(store: StoreApi<ViewerState>, requested: C
   if (!permission.allowed && (permission.reason === 'edit-mode' || permission.reason === 'workflow-running')) {
     return { ok: false, reason: permission.reason };
   }
-  // The generic history replay writes the local overlay, but property and
-  // quantity inverses do not mirror into the room CRDT. Never show a local-only
-  // Revert as a successful shared edit (#5902).
+  // The generic history replay writes the local overlay, but only a property or
+  // attribute edit the store mirrored into this session is mirrored again on
+  // replay (#10695); quantity, whole-set, placement and command edits are not.
+  // Never show a local-only Revert as a successful shared edit (#5902).
   if (state.collabRoomId !== null) return { ok: false, reason: 'shared-room' };
   if (!permission.allowed) return { ok: false, reason: permission.reason };
   for (const modelId of live.modelIds) {
@@ -138,7 +142,13 @@ export function revertChangeOperation(store: StoreApi<ViewerState>, requested: C
       applyTarget(store, mutation, 'undo');
       applied.push(mutation);
     }
+    // A position taken out from under a later edit would leave a conversion the export refuses: keep it as it was.
+    if (live.modelIds.some(modelId => leavesPartialPosition(store.getState(), modelId))) throw new PartialPositionError();
   } catch (error) {
+    if (error instanceof PartialPositionError) {
+      for (const mutation of applied.reverse()) applyTarget(store, mutation, 'redo');
+      return { ok: false, reason: 'newer-conflict' };
+    }
     const rollbackErrors: unknown[] = [];
     for (const mutation of applied.reverse()) {
       try { applyTarget(store, mutation, 'redo'); }

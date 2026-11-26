@@ -7,6 +7,7 @@
 use super::{CutContext, ExactState};
 use crate::router::voids::admission::{aabb_engulfs, ENGULF_TOLERANCE};
 use crate::router::voids::geom::{opening_redundant_with_host, wall_thinnest_axis_dir};
+use crate::kernel::mesh_bridge::SNAP_GRID;
 use crate::{Mesh, Point3, Vector3};
 
 /// A sequential miss handed to [`ExactState::fallback_635`].
@@ -18,6 +19,8 @@ pub(super) struct Fallback<'a> {
     pub(super) tri_before: usize,
     pub(super) failures_before: usize,
     pub(super) csg_unchanged: bool,
+    #[cfg(feature = "csg_manifold_gate")]
+    pub(super) gate_rejected: bool,
 }
 
 impl ExactState {
@@ -28,8 +31,20 @@ impl ExactState {
     /// the engulf or redundant-void guard suppresses it.
     pub(super) fn fallback_635(&mut self, result: &mut Mesh, context: CutContext<'_>, fallback: Fallback<'_>) {
         let CutContext { execution, clipper, wall_min, wall_max, .. } = context;
-        let Fallback { opening_mesh, open_min_pt, open_max_pt, extrusion_dir, tri_before, failures_before, csg_unchanged } =
+        let Fallback { opening_mesh, open_min_pt, open_max_pt, extrusion_dir, tri_before, failures_before, csg_unchanged, .. } =
             fallback;
+        // A touching cutter may reach the fallback after a manifold-gate
+        // rejection. The box clip can remove the flush core face even at
+        // authored depth, so first check the pre-weld source (#11313).
+        // The wall-frame rotation can move a flush cap by a few ULPs.
+        // Allow half a kernel grid step along the depth axis only.
+        if extrusion_dir.is_some_and(|dir| {
+            super::prepare::cutter_is_outside_source(
+                context.original_host, (open_min_pt, open_max_pt), dir, SNAP_GRID * 0.5,
+            )
+        }) {
+            return;
+        }
         let open_min_pt = &open_min_pt;
         let open_max_pt = &open_max_pt;
         let dir = extrusion_dir.or_else(|| {

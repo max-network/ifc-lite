@@ -394,6 +394,8 @@ Edits accumulate in the same overlay used by `setProperty` / `setAttribute`. The
 
 Use `StoreEditor.runAtomic` to create or modify a related set of IFC entities together. The callback receives a detached editor; a thrown error leaves the live overlay, mutation history and express-ID allocator unchanged. `MutablePropertyView.runAtomic` provides the same operation with a draft view for property and quantity edits.
 
+Use `MutablePropertyView.snapshotForInspection()` when a reader needs to retain the current overlay revision. It copies the overlay and shares the source tables and read configuration. Changes made to the copy are detached from the live view.
+
 An untouched draft reads the same model revision and overlay contents as its live view. Initializing an editor's express-ID watermark does not change that model revision; transaction validation checks the allocator separately so an intervening watermark change cannot be overwritten by publication.
 
 ```typescript
@@ -1250,7 +1252,9 @@ unmodified row without copying it into the draft. Use the ordinary getters or
 mutation methods for writes. `StoreEditor.readNewEntity` provides the same
 read-only borrow. `readNewEntityKinds(type?)`, `hasNewEntity(id)` and
 `getNewEntityCount()` answer enumeration and membership without reading any
-payload.
+payload. The read snapshot cache is bounded, and completed atomic transactions
+release temporary indexes even during a long synchronous session. Retained
+draft views remain private and rebuild their indexes when queried again.
 
 `planFootprintRoof(footprint, edgeSlopes, overhang)` exposes the same pure planner
 used by the roof builder for previews. Coordinates and overhang share a length
@@ -1308,6 +1312,17 @@ history after validation. Invalid or host-only undo records drop the entire
 history and return `historyDroppedReason`, while retaining the valid edits.
 The journal's model IDs are preserved; bind host stacks to the same logical
 model. Rebuild meshes and host Revert state separately after restoring.
+
+When historical model aliases have their own overlays, use
+`prepareMutationViewMerge(preferred, historicalViews)` to stage their
+reconciliation. All the views must refer to the same parsed source. Distinct
+edits survive, and the preferred view wins where both edit the same field.
+Historical views are applied in priority order. The host can inspect its undo
+and redo entries with `isShadowed(mutation)` before committing. Ambiguous
+entity or whole-set overlaps throw during preparation. `commit()` refuses
+to publish if any input overlay changed after preparation. A successful commit
+updates the preferred view and leaves the historical views available to their
+owners.
 
 For asynchronous work on a fork, use
 `const fork = view.prepareAtomic(draft => draft).result` and leave that
@@ -1391,3 +1406,22 @@ curtain wall is described in its own terms. Raw authored doors or windows with
 nonpositive or nonfinite numeric `OverallWidth` or `OverallHeight` report a quantity diagnostic and keep
 an empty derived quantity result; existing third-party quantity sets are
 preserved.
+
+### Ordering a bounded set of authored records
+
+`view.getNewEntityCreationOrder(expressId)` reads a live creation's relative insertion order without enumerating the session. It returns `null` for an ID that is not a live creation. Compare these numbers only within the current view order; atomic publication, undo and snapshot restoration may renumber them. Nested atomic drafts include their own new records.
+
+`view.getNewEntityReferenceSlotIds(type, slot, target)` projects a raw authored positional scalar reference. A `null` target includes absent and malformed values. Small class buckets are checked directly; larger classes use a maintained projection, including nested drafts and exposed-array edits. Combine candidates with attribute overrides and verify effective values before using them. This is a raw creation index, not an effective-record reader.
+
+`view.trackEntityChanges()` supplies a disposable invalidation cursor for derived
+inventories. `take()` returns changed entity IDs since the previous call, or
+`null` after a full restoration or more than 65,536 distinct changes. It includes
+skip-history writes, atomic publication and undo. Escaped mutable creation arrays
+remain conservative candidates on every call. Read effective records after the
+write completes, rebuild on `null`, and call `dispose()` when the inventory is
+retired. An unchanged detached draft can borrow the inventory identified by the
+cursor's `origin` view and revision; changes inside that draft remain separate.
+
+`view.getNewEntityType(id)` reads one live creation's authored class without
+borrowing its attributes or copying it into a draft. It returns `null` for an
+absent creation; consult `getEntityTypeMutation(id)` for an effective retype.

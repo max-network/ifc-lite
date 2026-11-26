@@ -10,52 +10,10 @@
 import type { DrawingPolygon, Point2D } from './types.js';
 import type { HatchLine } from './hatch-generator.js';
 import { HatchGenerator } from './hatch-generator.js';
-import type { HatchPattern, HatchPatternType } from './styles.js';
+import type { HatchPattern } from './styles.js';
 import { transformPoint, type Transform2D } from './svg-transform.js';
 import { escapeXml, svgNum } from './svg-format.js';
 import { resolveHatchPattern, type MaterialCategory } from './plan/material-hatch.js';
-
-type PatternBody = (s: number) => { size: number; transform?: string; body: string };
-
-const stroke = (width: number, color = '#000') => `stroke="${color}" stroke-width="${width}"`;
-
-/** One `<pattern>` per fillable type, id `hatch-<type>`; spacing `s` is in paper mm. */
-const PATTERN_DEFS: Partial<Record<HatchPatternType, PatternBody>> = {
-  diagonal: (s) => ({ size: s, transform: 'rotate(45)', body: `<line x1="0" y1="0" x2="0" y2="${s}" ${stroke(0.15)}/>` }),
-  'cross-hatch': (s) => ({
-    size: s,
-    body: `<line x1="0" y1="0" x2="${s}" y2="${s}" ${stroke(0.1)}/><line x1="${s}" y1="0" x2="0" y2="${s}" ${stroke(0.1)}/>`,
-  }),
-  horizontal: (s) => ({ size: s, body: `<line x1="0" y1="${s / 2}" x2="${s}" y2="${s / 2}" ${stroke(0.1)}/>` }),
-  vertical: (s) => ({ size: s, body: `<line x1="${s / 2}" y1="0" x2="${s / 2}" y2="${s}" ${stroke(0.1)}/>` }),
-  concrete: (s) => ({
-    size: s * 2,
-    body: `<circle cx="${s * 0.3}" cy="${s * 0.3}" r="0.3" fill="#666"/>`
-      + `<circle cx="${s * 1.3}" cy="${s * 1.3}" r="0.3" fill="#666"/>`
-      + `<circle cx="${s * 0.8}" cy="${s * 1.6}" r="0.2" fill="#888"/>`,
-  }),
-  steel: (s) => ({ size: s * 0.7, transform: 'rotate(45)', body: `<line x1="0" y1="0" x2="0" y2="${s * 0.7}" ${stroke(0.2, '#333')}/>` }),
-  brick: (s) => ({ size: s * 0.5, transform: 'rotate(45)', body: `<line x1="0" y1="0" x2="0" y2="${s * 0.5}" ${stroke(0.15)}/>` }),
-  wood: (s) => ({ size: s * 0.7, transform: 'rotate(135)', body: `<line x1="0" y1="0" x2="0" y2="${s * 0.7}" ${stroke(0.1)}/>` }),
-  earth: (s) => ({
-    size: s,
-    transform: 'rotate(45)',
-    body: `<line x1="0" y1="0" x2="0" y2="${s / 2}" ${stroke(0.15, '#555')}/>`,
-  }),
-};
-
-/** `<pattern>` definitions for every fillable hatch type, scaled like the drawing. */
-export function createHatchPatternDefs(scaleFactor: number): string {
-  const spacing = 3 * (scaleFactor / 100);
-  let defs = '';
-  for (const [type, make] of Object.entries(PATTERN_DEFS)) {
-    if (!make) continue;
-    const { size, transform, body } = make(spacing);
-    const rotate = transform ? ` patternTransform="${transform}"` : '';
-    defs += `    <pattern id="hatch-${type}" patternUnits="userSpaceOnUse" width="${size}" height="${size}"${rotate}>${body}</pattern>\n`;
-  }
-  return defs;
-}
 
 export function polygonToSvgPath(polygon: { outer: Point2D[]; holes: Point2D[][] }, transform: Transform2D): string {
   const ring = (points: Point2D[]): string => {
@@ -73,7 +31,7 @@ export function polygonToSvgPath(polygon: { outer: Point2D[]; holes: Point2D[][]
 function polygonFill(pattern: HatchPattern): string {
   if (pattern.type === 'solid') return pattern.fillColor || '#CCCCCC';
   if (pattern.type === 'glass') return pattern.fillColor || 'rgba(200, 230, 255, 0.3)';
-  return PATTERN_DEFS[pattern.type] ? `url(#hatch-${pattern.type})` : 'none';
+  return pattern.type === 'insulation' || pattern.type === 'none' ? 'none' : `url(#hatch-${pattern.type})`;
 }
 
 function renderHatchLine(hatchLine: HatchLine, transform: Transform2D, pattern: HatchPattern): string {

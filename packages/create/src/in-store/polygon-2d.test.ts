@@ -7,7 +7,7 @@ import { pointInPolygon, polygonArea } from '../index.js';
 
 const L_SHAPE: ReadonlyArray<readonly [number, number]> = [[0, 0], [4, 0], [4, 1], [1, 1], [1, 3], [0, 3]];
 
-describe('package polygon helpers', () => {
+describe('package polygon helpers (#10964)', () => {
   it('measures the shoelace area of a ring in either winding', () => {
     expect(polygonArea(L_SHAPE)).toBe(6);
     expect(polygonArea([...L_SHAPE].reverse())).toBe(6);

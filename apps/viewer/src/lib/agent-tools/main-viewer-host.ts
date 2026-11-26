@@ -25,6 +25,8 @@ import type { StoreApi } from '@/sdk/adapters/types';
 import type { BsddClient, ModelEditor, ModelHandle, ModelStatus, ToolHost } from './types.js';
 
 export interface MainViewerToolHostOptions {
+  /** Session lifetime for host-owned jobs, independently of individual MCP calls. */
+  lifetimeSignal?: AbortSignal;
   /** Defaults to a client through this site's `/api/bsdd` proxy (the public endpoint fails CORS). */
   bsdd?: BsddClient;
   /** Writes for the edit tools (`createMainViewerEditor`). Absent, every edit tool is refused. */
@@ -66,7 +68,7 @@ export function mainViewerModelStatus(entry: ModelLike, federated: FederatedMode
  * (`maxExpressId > 0`), lowest `idOffset` first. Every other sharer is a
  * `composed-layer` pointing at it, never a second answer for the same data.
  */
-function compositionOwners(entries: Array<[string, ModelLike]>, state: ViewerState): Map<string, string> {
+export function compositionOwners(entries: Array<[string, ModelLike]>, state: ViewerState): Map<string, string> {
   const sharers = new Map<object, string[]>();
   for (const [id, entry] of entries) {
     if (!entry.ifcDataStore) continue;
@@ -101,7 +103,9 @@ export function createMainViewerToolHost(
 ): ToolHost {
   const bsdd = options.bsdd ?? new BsddNamespace({ apiBase: '/api/bsdd' });
   return {
+    lifetimeSignal: options.lifetimeSignal,
     bsdd,
+    bim,
     ...(options.editor ? { editor: options.editor } : {}),
     models(): ModelHandle[] {
       const state: ViewerState = store.getState();

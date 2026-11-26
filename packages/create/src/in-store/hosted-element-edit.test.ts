@@ -19,9 +19,7 @@ import { readHostedFill } from './hosted-fill-read.js';
 import { placementInAncestor, refId, transformBounds } from './host-geometry-frame.js';
 import { reanchorHostedOpeningsInStore, reassignHostedOpeningsInStore } from './hosted-placement-edit.js';
 
-/** Every IfcProductDefinitionShape needs a ShapeOfProduct, and an
- * IfcShapeRepresentation belongs to exactly one product shape or map
- * (IfcShapeModel WR11). Lists the exported records that break either. */
+/** Exported records without a ShapeOfProduct, or representations without exactly one owner (IfcShapeModel WR11). */
 function shapeOwnershipFaults(step: string): string[] {
   const records = [...step.matchAll(/^#(\d+)=([A-Z0-9_]+)\((.*)\);\r?$/gm)];
   const typeOf = new Map(records.map(([, id, type]) => [id, type]));
@@ -340,7 +338,7 @@ describe('hosted occurrence edit (#6232)', () => {
   }
 
   for (const Schema of ['IFC2X3', 'IFC4', 'IFC4X3'] as const) {
-    it(`retires the replaced ${Schema} product shapes, so repeated resizes export schema-valid ownership`, async () => {
+    it(`retires the replaced ${Schema} product shapes, so repeated resizes export schema-valid ownership (#10960)`, async () => {
       const creator = new IfcCreator({ Schema, LengthUnit: 'MILLIMETRE' });
       const storey = creator.addIfcBuildingStorey({ Name: 'GF', Elevation: 0 });
       const store = await new IfcParser().parseColumnar(new TextEncoder().encode(creator.toIfc().content).buffer, { disableWorkerScan: true });

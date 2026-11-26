@@ -16,6 +16,7 @@ use crate::types::mesh::{InstanceRecord, MeshData};
 use crate::types::response::{ModelMetadata, ProcessingStats};
 
 mod color_layer;
+mod budget_report;
 mod csg_summary;
 #[cfg(test)]
 #[path = "csg_summary_tests.rs"]
@@ -174,5 +175,5 @@ pub(crate) fn process_observed(
     let observations = PassObservations {
         foreign_resource_scope: passed.ctx.foreign_resource_scope.load(std::sync::atomic::Ordering::Relaxed),
     };
-    (finalize::finish(content, passed, total_start, &pipeline_span), observations)
+    (finalize::finish(content, req, passed, total_start, &pipeline_span, sink), observations)
 }

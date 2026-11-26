@@ -29,7 +29,8 @@ use std::ops::Range;
 /// the digits unchanged leaves the reference exactly as authored and exactly as
 /// dangling, and agrees with [`crate::step_text::refs_in_line`], which no longer
 /// collects it (#3740).
-pub fn rewrite_refs(line: &[u8], offset: u32, remap: &impl Fn(u32) -> Option<u32>) -> String {
+#[cfg_attr(target_arch = "wasm32", inline(never))]
+pub fn rewrite_refs(line: &[u8], offset: u32, remap: &dyn Fn(u32) -> Option<u32>) -> String {
     let mut out: Vec<u8> = Vec::with_capacity(line.len() + 8);
     let mut copied = 0;
     for span in crate::step_text::ref_spans(line) {
@@ -69,7 +70,7 @@ pub(super) enum LineDecision {
 
 /// Collect every `#N` reference in a line's ARGUMENT list, skipping the leading
 /// `#id=` (which is the line's own id, not an outgoing reference).
-pub(super) fn arg_refs(line: &[u8], out: &mut Vec<u32>) {
+pub(crate) fn arg_refs(line: &[u8], out: &mut Vec<u32>) {
     // A complete entity record starts with its own #id. Scan from that
     // boundary so an equals sign inside head trivia cannot cut a comment in
     // half. Keep collecting references even from an unreadable body: the drop

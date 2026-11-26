@@ -7,11 +7,7 @@ import assert from 'node:assert';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 
-// @ifc-lite/ifcx only decodes IFCx point attributes, but it imported them from
-// the @ifc-lite/pointcloud root, which also carries the LAZ streaming source and
-// its Vite-only `laz-perf/lib/web/laz-perf.wasm?url` import. Every non-Vite
-// bundle of the SDK (esbuild, wrangler) then failed to resolve that asset.
-describe('@ifc-lite/ifcx bundles without a Vite asset pipeline', () => {
+describe('@ifc-lite/ifcx bundles without a Vite asset pipeline (#10962)', () => {
   it('bundles its index with esbuild and pulls in no laz-perf module', async () => {
     const entry = fileURLToPath(new URL('./index.ts', import.meta.url));
     const result = await build({

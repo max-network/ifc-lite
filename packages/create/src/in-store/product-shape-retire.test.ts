@@ -26,7 +26,7 @@ async function wallSession() {
   return { store, view, editor, first, second, shapeOf, exported };
 }
 
-describe('retireProductShape', () => {
+describe('retireProductShape (#10960)', () => {
   it('removes a removed product\'s shape and representations, keeping the context', async () => {
     const { store, editor, first, second, shapeOf, exported } = await wallSession();
     const shape = shapeOf(first)!;

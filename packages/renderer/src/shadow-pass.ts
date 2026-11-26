@@ -57,11 +57,8 @@ export class ShadowPass {
 
   private bindGroupLayout: GPUBindGroupLayout;
   private pipelines: Record<ShadowDrawKind, GPURenderPipeline>;
-  /**
-   * Clipping twins of {@link pipelines} — same state plus the discarding
-   * fragment stage. Built on the first clipped frame only, so a session that
-   * never sections anything never pays for the extra pipelines.
-   */
+  /** Twins of {@link pipelines} plus the discarding fragment stage, built on the
+   *  first clipped or partly hidden frame only, so plain sessions never pay for them. */
   private clipPipelines: Record<ShadowDrawKind, GPURenderPipeline> | null = null;
   private shaderModule: GPUShaderModule;
   private pipelineLayout: GPUPipelineLayout;
@@ -111,13 +108,9 @@ export class ShadowPass {
       label: 'shadow-bgl',
       entries: [
         { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'uniform' } },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.VERTEX,
-          buffer: { type: 'uniform', hasDynamicOffset: true, minBindingSize: PER_DRAW_BYTES },
-        },
-        // Read only by the clipping fragment stage; the depth-only pipelines
-        // simply leave this entry unused.
+        // The fragment stage reads `entity.y`, the visibility-test flag (#10264 S2).
+        { binding: 1, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform', hasDynamicOffset: true, minBindingSize: PER_DRAW_BYTES } },
+        // Read only by the fragment stage; the depth-only pipelines leave it unused.
         { binding: 2, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
       ],
     });
@@ -186,10 +179,9 @@ export class ShadowPass {
     this.lightScratch.set(lightViewProj.m, 0);
     packRteOrigin(rte?.cameraWorld ?? [0, 0, 0], this.lightScratch, 16);
     this.device.queue.writeBuffer(this.lightBuffer, 0, this.lightScratch);
-
+    // The fragment set runs for a cut, and for a partly hidden batch's visibility test (#10264 S2).
     const clipping = this.writeClipUniform(clip, rte);
-    if (clipping && !this.clipPipelines) this.clipPipelines = this.createPipelineSet(true);
-    const pipelines = clipping && this.clipPipelines ? this.clipPipelines : this.pipelines;
+    if ((clipping || draws.some((d) => d.visibilityFiltered)) && !this.clipPipelines) this.clipPipelines = this.createPipelineSet(true);
 
     // Occluders outside the camera-relative envelope cannot be rasterised in
     // this RTE frame (#6128): a flat draw is skipped whole (`drawable`), an
@@ -210,9 +202,12 @@ export class ShadowPass {
       }], rte?.cameraWorld ?? [0, 0, 0])[0]!;
     }
 
-    if (draws.length > this.drawBufferSlots) {
+    // One extra slot (identity model, no origin) for the pool's instanced draws.
+    const pool = rte?.instancePool ?? null;
+    const slotsNeeded = draws.length + (pool ? 1 : 0);
+    if (slotsNeeded > this.drawBufferSlots) {
       let slots = this.drawBufferSlots;
-      while (slots < draws.length) slots *= 2;
+      while (slots < slotsNeeded) slots *= 2;
       this.drawBufferSlots = slots;
       this.drawBuffer.destroy();
       this.drawBuffer = this.createDrawBuffer(slots);
@@ -221,10 +216,12 @@ export class ShadowPass {
     }
 
     const strideFloats = this.drawStride / 4;
+    const words = new Uint32Array(this.drawScratch.buffer);
     for (let i = 0; i < draws.length; i++) {
       const d = draws[i];
       const base = i * strideFloats;
-      new Uint32Array(this.drawScratch.buffer)[base + 28] = d.entityIdAnchor ?? 0;
+      words[base + 28] = d.entityIdAnchor ?? 0;
+      words[base + 29] = d.visibilityFiltered ? 1 : 0;
       if (d.model) this.drawScratch.set(d.model, base);
       // Translation is always supplied through the f64 origin lanes below.
       // Retaining it in the f32 model matrix would add a 5,000-km number before
@@ -248,13 +245,14 @@ export class ShadowPass {
         drawable[i] = tryPackRteDrawableDelta(origin, camera, this.drawScratch, base + 20);
       }
     }
-    if (draws.length > 0) {
+    if (pool) { const o = draws.length * strideFloats; this.drawScratch.fill(0, o, o + strideFloats); for (const k of [0, 5, 10, 15]) this.drawScratch[o + k] = 1; }
+    if (slotsNeeded > 0) {
       this.device.queue.writeBuffer(
         this.drawBuffer,
         0,
         this.drawScratch.buffer,
         this.drawScratch.byteOffset,
-        draws.length * this.drawStride,
+        slotsNeeded * this.drawStride,
       );
     }
 
@@ -273,11 +271,11 @@ export class ShadowPass {
     for (let i = 0; i < draws.length; i++) {
       const d = draws[i];
       if (!drawable[i]) continue;
-      pass.setPipeline(pipelines[d.kind]);
+      pass.setPipeline((clipping || d.visibilityFiltered ? this.clipPipelines! : this.pipelines)[d.kind]);
       bindSectionExclusions(pass, this.device, 1);
       pass.setBindGroup(0, this.drawBindGroup, [i * this.drawStride]);
       pass.setVertexBuffer(0, d.vertexBuffer);
-      pass.setIndexBuffer(d.indexBuffer, 'uint32');
+      pass.setIndexBuffer(d.indexBuffer, d.indexFormat ?? 'uint32');
       if (d.kind === 'instanced') {
         const runs = instanceRuns[i];
         if (!runs || !d.instanceBuffer || !d.rteDeltas) continue;
@@ -287,6 +285,14 @@ export class ShadowPass {
       } else {
         pass.drawIndexed(d.indexCount);
       }
+    }
+
+    if (pool) {
+      // Hidden, isolated-out and tombstoned occurrences are already compacted out of these streams.
+      pass.setPipeline((clipping ? this.clipPipelines! : this.pipelines).instanced);
+      bindSectionExclusions(pass, this.device, 1);
+      pass.setBindGroup(0, this.drawBindGroup, [draws.length * this.drawStride]);
+      pool.draw(pass);
     }
 
     pass.end();
@@ -309,7 +315,11 @@ export class ShadowPass {
   private writeClipUniform(clip: ShadowClip | null | undefined, rte?: ShadowRteFrame | null): boolean {
     const section = clip?.section;
     const box = clip?.box;
-    if (!section && !box && !clip?.extraPlanes?.length) return false;
+    if (!section && !box && !clip?.extraPlanes?.length) {
+      // The fragment set may still run for visibility: leave it nothing to cut.
+      if (this.clipFlags[12] !== 0 || this.clipFlags[16] !== 0) { this.clipScratch.fill(0); this.device.queue.writeBuffer(this.clipBuffer, 0, this.clipScratch); }
+      return false;
+    }
 
     const s = this.clipScratch;
     const camera = rte?.cameraWorld ?? [0, 0, 0] as const;

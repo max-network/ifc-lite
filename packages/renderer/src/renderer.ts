@@ -25,7 +25,7 @@ export { reorderSnapshotPieces } from './scene-snapshot-batches.js';
 export { appearanceSourceTriangle, expandAppearanceCorners, equivalentAppearanceGeometry } from './appearance-uvs.js';
 export { sameCompanionParts } from './appearance-companions.js';
 export { invertAppearancePartition, validateAppearancePartition, type AppearancePreview, type AppearanceOwner, type AppearanceToken, type AppearanceChange, type AppearancePartition, type AppearancePartitionPart } from './appearance-preview.js';
-import { deferOpaqueVisibilityFrame } from './opaque-visibility-pass.js';
+import { deferOpaqueVisibilityFrame, setFrameLeadCommands } from './opaque-visibility-pass.js';
 import type { AppearancePreview } from './appearance-preview.js';
 import { createReferenceImageManager } from './reference-image-host.js';
 export type { ReferenceImages, ReferenceImageInput, ReferenceImageHit, ReferenceCorners } from './reference-image-types.js';
@@ -62,32 +62,8 @@ export { SymbolicTextAtlas } from './symbolic-text-atlas.js';
 // Section cap styling (hatch pattern ids + default colours). The cap itself
 // is now rendered by Section2DOverlayRenderer's fill pass; this module just
 // holds the styling primitives shared with the store and UI.
-export { DEFAULT_CAP_STYLE, HATCH_PATTERN_IDS } from './section-cap-style.js';
-export type { SectionCapStyle, HatchPatternId } from './section-cap-style.js';
-export { planeBasis, nearestCardinalAxis } from './section-plane-basis.js';
-export type { PlaneBasis, Vec3Tuple } from './section-plane-basis.js';
-export { capHighlightKey } from './section-2d-overlay.js';
-export { SECTION_BOX_CAP_FACES, sectionBoxCapKey } from './section-box-caps.js';
-export type { SectionBoxCapFace } from './section-box-caps.js';
-export type { Section2DOverlayOptions, Section2DOverlayCapStyle, CutPolygon2D, DrawingLine2D, LineOverlayChannel, LineOverlayOptions } from './section-2d-overlay.js';
-export { LINE_OVERLAY_CHANNELS } from './section-2d-overlay.js';
-export { Raycaster } from './raycaster.js';
-export { SnapDetector, SnapType } from './snap-detector.js';
-export { BVH } from './bvh.js';
-export { hostsOtherEntities } from './mesh-entity-hosting.js';
-export { OverlayIdSpaceExhaustedError } from './overlay-id-space-exhausted-error.js';
-export { FederationRegistry, federationRegistry, ModelRangeExtensionRefusedError } from './federation-registry.js';
-export type { ModelRange, GlobalIdLookup } from './federation-registry.js';
+export * from './renderer-exports.js';
 export * from './types.js';
-export { MAX_EXTRA_CLIP_PLANES } from './extra-clip-planes.js';
-export type { SectionPlaneFrame, SectionFrameInput } from './section-plane-frames.js';
-export {
-    resolveEnvironment,
-    deriveSkyGradient,
-    packEnvironmentUniforms,
-    ENVIRONMENT_UNIFORM_SIZE,
-} from './environment.js';
-export type { LightingEnvironment, ResolvedEnvironment, SkyGradient, Vec3Color } from './environment.js';
 export type { OverlayTheme, Rgba as OverlayThemeRgba } from './overlay-theme.js';
 export { DEFAULT_OVERLAY_THEME } from './overlay-theme.js';
 import { DEFAULT_OVERLAY_THEME, type OverlayTheme } from './overlay-theme.js';
@@ -102,6 +78,7 @@ export { resolveContributionThresholdPx, projectedAabbRadiusPx } from './contrib
 export type { ContributionCullOptions, CullCameraState } from './contribution-cull.js';
 export { chunkCellKey, bucketBaseKeyFor, DEFAULT_CHUNK_CELL_SIZE } from './chunk-grid.js';
 export type { SpatialChunkingConfig, ChunkAnchorSource } from './chunk-grid.js';
+export { resolveDrawStreamConfig, DEFAULT_DRAW_STREAM_CONFIG, DRAW_STREAM_CONFIG_KEYS, type DrawStreamConfig, type DrawStreamOverrides } from './draw-stream-config.js';
 export { selectEvictions, MIN_EVICTION_AGE_FRAMES } from './residency.js';
 export type { ResidencyShell, ColdGeometryProvider } from './residency.js';
 export { simplifyIndicesByClustering, lodCellSizeForBounds, LOD_MIN_TRIANGLES, LOD_CELL_FRACTION } from './lod-simplify.js';
@@ -199,13 +176,15 @@ import type { Intersection } from './raycaster.js';
 import type { SnapTarget, SnapOptions, EdgeLockInput, MagneticSnapResult } from './snap-detector.js';
 import { PickingManager } from './picking-manager.js';
 import { RaycastEngine } from './raycast-engine.js';
+import type { CpuGeometryVisitor } from './cpu-geometry-visit.js';
 import { RenderDegradationMonitor, type RenderDegradationInfo } from './render-degradation.js';
 import { PostPassChain } from './post-pass-chain.js';
-import { buildSelectionOutlineFrame, matchesHoveredMesh } from './selection-outline-frame.js';
+import { buildSelectionOutlineFrame, hoverSources } from './selection-outline-frame.js';
 import { HoverMeshCache } from './hover-mesh-cache.js';
+import { HoverBatches } from './batch-highlight.js';
+import { drawSelectionHighlights } from './selection-highlight-draw.js';
 import { addMergedSelectionMeshes } from './selection-hydration.js';
 import { recordSelectionSource } from './selection-hydration-order.js';
-import { isBorrowedSelection, stageBorrowedSelection } from './textured-selection.js';
 import { SelectionHighlight, SelectionSnapshot } from './selection-highlight.js';
 import { InteractionEffectsGovernor } from './interaction-effects-governor.js';
 import { resolveOpaqueDrawMode } from './opaque-draw-variants.js'; import { sortOpaqueFrontToBack } from './opaque-draw-order.js'; import { renderTargetBytes, type RenderTargetBytes } from './render-target-bytes.js';
@@ -222,8 +201,12 @@ import { fitSunLightMatrix, cameraFrustumFocusCorners, resolveShadowNormalBiasMe
 import { collectShadowOccluders } from './shadow-occluders.js';
 import { drawInstanceRuns, uploadInstancedRteDeltas, type InstanceRun } from './instanced-rte.js';
 import { INSTANCED_RTE_DELTA_SLOT } from './instanced-vertex-layout.js';
+import { POOL_VIEW_SHADOW, type GpuInstancePool } from './gpu-instance-pool.js';
+import { poolCullParams } from './gpu-instance-cull.js';
 import { shadowOccluderBatches } from './shadow-occluder-batches.js';
-import { batchForWholeDraw, pushWholeSplit } from './residency.js';
+import { batchForWholeDraw, pushSplit } from './residency.js';
+import { BatchVisibilityCache, batchEntities, canFilterOnGpu } from './batch-visibility.js';
+import { FrameEntityVisibility, MESH_FLAG_ENTITY_VISIBILITY } from './entity-visibility-table.js';
 import { captureRendererScreenshot } from './renderer-screenshot.js';
 import { traceRendererColorFrameEncoder, beginRendererColorFrameCapture, cancelRendererColorFrame, discardRendererColorFrameReadback, encodeRendererColorFrameCapture, requestRendererColorFrame, retryRendererColorFrame, settleRendererColorFrameCapture, type RendererColorFrame, type RendererColorFrameCapture } from './renderer-color-readback.js';
 import { shouldRouteMeshTransparent, shouldRouteBatchTransparent, DEFAULT_GHOST_ALPHA } from './overlay-routing.js';
@@ -249,7 +232,10 @@ export type { DeviationAssetRange, DeviationAssetSummary, DeviationAsyncOptions,
 import { runGuardedGpuUpload, isDeviceLossThrow, type GpuUploadOutcome } from './gpu-upload-guard.js';
 import { enableRendererQuantizedBatches } from './quantized-lifecycle.js';
 import { recoverRendererDevice, rendererDestroyedError, rendererDeviceLostError, type DeviceRecoveryOmission, type DeviceRecoveryResult, type RendererRecoveryHost } from './device-recovery.js';
-
+import type { ReleasedSceneRebuild } from './released-scene-recovery.js';
+import type { StreamFrameStats } from './draw-stream.js';
+import { RendererDrawStream } from './draw-stream-frame.js';
+import type { DrawStreamConfig } from './draw-stream-config.js';
 
 /**
  * Main renderer class
@@ -289,6 +275,7 @@ export class Renderer {
     private postPasses: PostPassChain | null = null;
     /** GPU copies of the hovered entity for the hover outline (#5390); see hover-mesh-cache.ts. */
     private readonly hoverMeshes = new HoverMeshCache();
+    private readonly hoverBatches = new HoverBatches();
     private readonly warnedHighlightUploads = new Set<string>();
     /** Device px per CSS px in the drawing buffer; CSS-px sizes scale by it (#5383). */
     private pixelRatio = 1;
@@ -412,7 +399,7 @@ export class Renderer {
     private deviceLostListeners = new Set<(info: { message: string; reason: string }) => void>();
     private deviceLossSequence = 0;
     private readonly recovery = {
-        inFlight: null as Promise<DeviceRecoveryResult> | null, lostReferenceImages: false, quantizedBatchesRequested: false, omissions: new Set<DeviceRecoveryOmission>(), pointCloudOptions: null as Readonly<ResolvedPointCloudRenderOptions> | null, replacementLostInfo: null as { message: string; reason: string } | null,
+        inFlight: null as Promise<DeviceRecoveryResult> | null, lostReferenceImages: false, quantizedBatchesRequested: false, omissions: new Set<DeviceRecoveryOmission>(), pointCloudOptions: null as Readonly<ResolvedPointCloudRenderOptions> | null, replacementLostInfo: null as { message: string; reason: string } | null, releasedRebuild: null as ReleasedSceneRebuild | null, initStartedGeneration: 0,
     };
     /** BIM ↔ scan deviation: owns the compute pipeline + its BVH cache. Null under `@ifc-lite/renderer/core`. */
     private readonly deviationComputer: DeviationComputer | null = pointCloudSupport()?.createDeviationComputer() ?? null;
@@ -494,6 +481,8 @@ export class Renderer {
     private _renderSkipCount: number = 0;
     /** Snapshot of the last completed render() — see getFrameStats(). */
     private _lastFrameStats: FrameStats | null = null;
+    /** Stateless flat-batch draw stream (draw-stream.ts); off unless `setDrawStreamConfig` enables it. */
+    private readonly drawStream = new RendererDrawStream();
     private _renderErrorCount: number = 0;
     private _lastRenderError: string = '';
     // Dirty flag: set by requestRender(), consumed by the animation loop.
@@ -516,19 +505,13 @@ export class Renderer {
     private _lastColorOverrideGen: number = -1;
     private _xrayVersion: number = 0;
     private _lastHadPartialSources: boolean = false;
-    // Cached per-batch visibility, valid only while `_batchVisibilityEpoch`
-    // matches `_visibilityVersion`. Avoids the O(total element count) recompute
-    // (+ per-batch visible-id Set allocation) every frame while hide/isolate
-    // holds. Keyed by batch object (immutable expressIds per instance); a
-    // rebuilt batch is a new object → recomputed lazily. WeakMap, not Map:
-    // residency eviction/restore churn while ONE filter epoch holds (e.g. a
-    // schedule animation) would otherwise pin every dead batch object until
-    // the next visibility change.
-    private _batchVisibilityEpoch: number = -1;
-    private _batchVisibilityCache = new WeakMap<
-        BatchedMesh,
-        { visible: boolean; fullyVisible: boolean; visibleIds?: Set<number> }
-    >();
+    // Per-batch hide/isolate class for the current visibility epoch, shared by
+    // the colour and shadow passes (batch-visibility.ts, #10264 S2).
+    private readonly _batchVisibility = new BatchVisibilityCache();
+    // This frame's write into the shared GPU visibility table; false when the
+    // table cannot hold the sets, so partly hidden batches stay undrawn.
+    private readonly _frameVisibility = new FrameEntityVisibility();
+    private _gpuVisibility = false;
     // The selection and its highlight meshes, kept across frames so a frame of an
     // unchanged selection does no work per selected entity (#9835).
     private readonly _selection = new SelectionSnapshot();
@@ -566,6 +549,7 @@ export class Renderer {
         this.pickingManager.setAnnotationPickProvider((x, y, width, height, options, clip) =>
             this.overlays.annotationPicker.pick(this.camera, x, y, width, height, options, clip));
         this.raycastEngine = new RaycastEngine(this.camera, this.scene, this.canvas);
+        this.raycastEngine.viewStampExtra = () => String(this._pickClipRevision.revision); // a section change exposes other surfaces
     }
 
     /**
@@ -615,7 +599,7 @@ export class Renderer {
         generation: number,
         options: { clearDeviceLost?: boolean; publishReady?: boolean } = {},
     ): Promise<void> {
-        // `pipeline` is the marker for "a previous init() completed": it is
+        this.recovery.initStartedGeneration = generation; // `pipeline` marks "a previous init() completed": it is
         // assigned unconditionally there and nulled by destroy().
         if (this.pipeline !== null) {
             // Release the previous GPU lifetime and revoke readiness without
@@ -674,6 +658,7 @@ export class Renderer {
         // init() before a device-loss re-init, so it isn't lost (#5484).
         this.pipeline.selectionColorUniform.update(this.overlayTheme.selection);
         this.picker = new Picker(this.device, width, height);
+        this.picker.setInstancePoolProvider(() => this.scene.getGpuInstancePool());
         this.depthProbe?.destroy(); this.depthProbe = FrameDepthProbe.forPipeline(this.device.getDevice(), this.pipeline);
         this.overlays.init(
             this.device.getDevice(),
@@ -857,6 +842,7 @@ export class Renderer {
     recoverDevice(): Promise<DeviceRecoveryResult> {
         return recoverRendererDevice(this as unknown as RendererRecoveryHost);
     }
+    setReleasedSceneRebuild(rebuild: ReleasedSceneRebuild | null): void { this.recovery.releasedRebuild = rebuild; } // lets recoverDevice rebuild a released scene (#10264); null refuses it again
 
     /**
      * `onLossDetected` for every `runGuardedGpuUpload` call below (#4885):
@@ -1343,30 +1329,10 @@ export class Renderer {
         this.modelBoundsTracker.set(bounds);
     }
 
-    /**
-     * The batched occluders the sun shadow pass should cast, filtered to the same
-     * visibility the colour pass draws (#2670, Phase 2b). Without filtering every
-     * batch casts. With hide/isolate active a fully-hidden batch is dropped and a
-     * partially-hidden OPAQUE batch casts only its visible subset via the SAME
-     * cached partial sub-batch the colour pass renders (shared cache key
-     * `${colorKey}:${id}` + `_partialBatchEpoch`), so no extra clone memory and no
-     * phantom shadow from an individually-hidden element in a shared batch. That
-     * sharing lapses while X-Ray splits the same batch further (#4129): the colour
-     * pass then draws `:x0`/`:x1` slots and this slot owns its own clone — right,
-     * since a ghosted element still casts its real shadow.
-     *
-     * Transparent (glass-like) partially-hidden parents are left to the collector's
-     * material-alpha filter — they don't cast at all, so building a visible subset
-     * for them would waste a clone (and diverge from the colour pass's promotion
-     * split keys). Fully-visible transparent batches pass through unchanged and the
-     * collector drops them.
-     */
-    private shadowOccluderBatches(
-        options: RenderOptions,
-        device: GPUDevice,
-        hasVisibilityFiltering: boolean,
-    ): BatchedMesh[] {
-        return shadowOccluderBatches(this.scene, options, device, hasVisibilityFiltering, this.pipeline, this._partialBatchEpoch);
+    /** The batched occluders the sun shadow pass casts (shadow-occluder-batches.ts). */
+    private shadowOccluderBatches(options: RenderOptions, device: GPUDevice): BatchedMesh[] {
+        const visibility = (batch: BatchedMesh) => this._batchVisibility.classify(batch, this._visibilityVersion, options.hiddenIds, options.isolatedIds);
+        return shadowOccluderBatches(this.scene, device, this.pipeline, visibility, this._gpuVisibility);
     }
 
     /** Guarded entry point (#4885) for the unguarded body below. */
@@ -1592,6 +1558,7 @@ export class Renderer {
      */
     private renderFrame(options: RenderOptions): boolean {
         const frameStart = performance.now(); let textureWaitMs = 0; // FrameStats.cpuMs
+        let frameStream: StreamFrameStats | undefined; // FrameStats.stream
         if (!this.device.isInitialized() || !this.pipeline) {
             this._renderSkipCount++;
             return false;
@@ -1732,7 +1699,9 @@ export class Renderer {
             selected: selectedExpressIds, selectionVersion: this._selection.getVersion(),
             hiddenIds: options.hiddenIds, isolatedIds: options.isolatedIds, visibilityVersion: newVisibilityVersion,
             modelIndex: selectedModelIndex, itemFilterExpressId, itemFilterItemId, pool: this.scene.getBatchedMeshes().length > 0 || this.scene.getTexturedMeshes().length > 0,
-        }, (piece) => this.createMeshFromData(piece).ok, (pieces, merged) => this.createMergedMeshes(pieces, merged), { device, pipeline: this.pipeline });
+        }, (piece) => this.createMeshFromData(piece).ok, (pieces, merged) => this.createMergedMeshes(pieces, merged),
+            { device, pipeline: this.pipeline, get table() { return sectionExclusions(device); }, onTableReady: () => this.requestRender(), onPipelineReady: () => this.requestRender(),
+              entityIndex: this.drawStream.highlightIndex });
 
         let meshes = this.scene.getMeshes();
 
@@ -1897,6 +1866,7 @@ export class Renderer {
                 : null;
             this._sectionExcludedIds = new Set(options.sectionExcludedIds);
             sectionExclusions(device).update(this._sectionExcludedIds);
+            this._gpuVisibility = this._frameVisibility.write(sectionExclusions(device), this._visibilityVersion, options.hiddenIds, options.isolatedIds, () => this.requestRender());
             this._activePickExtraPlanes = extraClipPlanes.length > 0 ? extraClipPlanes.map((p) => ({ normal: [...p.normal] as [number, number, number], distance: p.distance, flipped: p.flipped })) : null;
             this._activePickClipBox = options.clipBox?.enabled
                 ? {
@@ -1971,6 +1941,13 @@ export class Renderer {
             // Now record draw commands
             const encoder = traceRendererColorFrameEncoder(colorCapture, device.createCommandEncoder());
             beginRendererGpuTiming(this, device, encoder);
+
+            // GPU-driven instancing: upload state edits, then each view culls + compacts on the GPU before the passes that read it.
+            const instancePool: GpuInstancePool | null = this.scene.getInstancedTemplates().length > 0 ? this.scene.getGpuInstancePool() : null;
+            if (instancePool) { this.scene.setGpuPoolHover(options.hoverOutline?.id ?? null, options.hoverOutline?.modelIndex); instancePool.flush(); }
+            const colourCull = instancePool && poolCullParams(this.camera, rteCullCamera, rteCullFrustum.planes, resolveContributionThresholdPx(options.contributionCull, interacting), this.canvas.height / this.pixelRatio);
+            const orthoPre = instancePool !== null && colourCull !== null && this.camera.getProjectionMode() === 'orthographic'; // its depth prepass is a separate, earlier command buffer
+            if (orthoPre) { const pre = device.createCommandEncoder({ label: 'instance-cull' }); instancePool.cull(pre, colourCull); setFrameLeadCommands(encoder, pre.finish()); }
 
             // Sun shadow-map pass (#2670, Phase 2). Off unless the caller opts
             // in; when off the hot path pays only this check and (once) an
@@ -2049,8 +2026,8 @@ export class Renderer {
                             // sub-batch the colour pass renders), so an
                             // individually-hidden element in a shared batch stops
                             // casting instead of throwing a phantom shadow.
-                            batches: this.shadowOccluderBatches(options, device, hasVisibilityFiltering),
-                            instanced: this.scene.getInstancedTemplates(),
+                            batches: this.shadowOccluderBatches(options, device),
+                            instanced: instancePool ? [] : this.scene.getInstancedTemplates(),
                             textured: this.scene.getTexturedMeshes(),
                             // Individual meshes cast too (Renderer.addMesh() /
                             // no-batch fallback); the collector skips hydrated
@@ -2064,6 +2041,7 @@ export class Renderer {
                     // casting too, or the sliced-off roof keeps shadowing the
                     // floor it no longer covers. `sectionPlaneData` already
                     // folds in the terrain clip, so that is covered as well.
+                    instancePool?.cull(encoder, { eye: shadowEye, planes: null, thresholdPx: 0 }, undefined, POOL_VIEW_SHADOW); // every live occurrence casts
                     this.shadowPass.render(encoder, fit.lightViewProj, occluders, {
                         sectionExcludedIds: this._sectionExcludedIds,
                         section: sectionPlaneData?.enabled
@@ -2077,7 +2055,7 @@ export class Renderer {
                             ? { min: options.clipBox.min, max: options.clipBox.max }
                             : null,
                         extraPlanes: extraClipPlanes,
-                    }, { cameraWorld: shadowEye });
+                    }, { cameraWorld: shadowEye, instancePool });
 
                     // Shadow uniform: light matrix + sampling params. The kernel
                     // width follows the sun's angular size (physical, ~0.53°
@@ -2130,6 +2108,7 @@ export class Renderer {
             // Build color attachments — skip objectId in single-target mode
             const splatFrame = this.gaussianLayer.frameReady(); // #8564: the Gaussian pass after this one loads colour and resolves MSAA
             const glass = splatFrame ? this.gaussianLayer.glassRecorder(this.pipeline.visibility) : null; // holds transparent IFC for the nearest-glass split
+            if (instancePool && colourCull && (!orthoPre || shadowsThisFrame)) instancePool.cull(encoder, colourCull, renderPassTimestampWrites(encoder, 'instance-cull')); // (again, after the shadow view)
             const colorAttachments: GPURenderPassColorAttachment[] = [
                 {
                     // If MSAA enabled: render to multisample texture, resolve to swap chain
@@ -2284,62 +2263,38 @@ export class Renderer {
                     };
                 }
 
-                // Per-batch visibility (only meaningful while filtering is active).
-                // A batch is visible if ANY of its elements are visible, fully
-                // visible if ALL are. Cached across frames keyed by the visibility
-                // version so the O(total element count) scan + per-batch visible-id
-                // Set allocation happens once per visibility change, not per frame.
-                // The cache map is keyed by batch object (immutable expressIds per
-                // instance); a rebuilt batch is a new object → recomputed lazily.
-                if (this._batchVisibilityEpoch !== this._visibilityVersion) {
-                    this._batchVisibilityCache = new WeakMap();
-                    this._batchVisibilityEpoch = this._visibilityVersion;
-                }
-                const batchVisibilityCache = this._batchVisibilityCache;
-                const getBatchVisibility = (
-                    batch: typeof allBatchedMeshes[number],
-                ): { visible: boolean; fullyVisible: boolean; visibleIds?: Set<number> } => {
-                    let vis = batchVisibilityCache.get(batch);
-                    if (vis) return vis;
-                    const total = batch.expressIds.length;
-                    // Build the visible-id set in one pass; drop it for fully-visible
-                    // batches (they draw from their own buffers, no subset needed).
-                    const visibleIds = new Set<number>();
-                    for (const expressId of batch.expressIds) {
-                        const isHidden = options.hiddenIds?.has(expressId) ?? false;
-                        const isIsolated = !hasIsolatedFilter || options.isolatedIds!.has(expressId);
-                        if (!isHidden && isIsolated) visibleIds.add(expressId);
-                    }
-                    const fullyVisible = visibleIds.size === total;
-                    vis = {
-                        visible: visibleIds.size > 0,
-                        fullyVisible,
-                        visibleIds: fullyVisible ? undefined : visibleIds,
-                    };
-                    batchVisibilityCache.set(batch, vis);
-                    return vis;
-                };
-
-                // Separate batches into opaque and transparent, filtering by visibility
-                // IMPORTANT: Only render FULLY visible batches - partially visible batches
-                // need individual mesh rendering to show only the visible elements
+                // Separate batches into opaque and transparent, filtering by visibility.
+                // A partly hidden batch is drawn whole and the GPU discards its hidden
+                // entities (#10264 S2): `filtered` maps each such draw to its visible
+                // part, which decides its fade, ghosting and routing.
                 const opaqueBatches: typeof allBatchedMeshes = [];
                 const transparentBatches: typeof allBatchedMeshes = [];
+                const filtered = new Map<BatchedMesh, AlphaBatchLike>();
+                const drawnPart = (batch: BatchedMesh): AlphaBatchLike => filtered.get(batch) ?? batch;
 
-                // PERFORMANCE FIX: Track partially visible batches for sub-batch rendering
-                // Instead of creating 10,000+ individual meshes, we create cached sub-batches.
-                // The collector also owns the override-promotion split (#677) and the
-                // per-entity X-Ray alpha split (#4129) — see partial-batch-requests.ts.
+                // Sub-batches only for colour, never for visibility: the override-
+                // promotion split (#677) and the per-entity X-Ray alpha split (#4129),
+                // see partial-batch-requests.ts.
                 const partialRequests = new PartialBatchRequests(
                     colorOverrides,
                     xray,
                     (b) => this.scene.canPartitionBatch(b),
                 );
                 const partiallyVisibleBatches = partialRequests.items;
-                const pushVisibleAsPartial = partialRequests.pushVisible.bind(partialRequests);
-                const pushAlphaSplit = partialRequests.pushAlphaSplit.bind(partialRequests);
+                const route = (b: BatchedMesh, part: AlphaBatchLike | null): void => {
+                    if (part) filtered.set(b, part);
+                    const drawn = part ?? b;
+                    (shouldRouteBatchTransparent(alphaForBatch(drawn, b.color[3]), batchEntities(drawn), colorOverrides) ? transparentBatches : opaqueBatches).push(b);
+                };
 
-                for (let batch of allBatchedMeshes) {
+                // Draw stream: once engaged, plain opaque whole batches move to it; the rest stay in this loop.
+                const loopBatches = !this.drawStream.enabled ? allBatchedMeshes : this.drawStream.begin(device, this.pipeline, allBatchedMeshes, this.scene.getPickGeometryRevision(),
+                    `${this._partialBatchEpoch}|${xray.active}|${options.emphasizeOverrides === true}|${hasVisibilityFiltering}`, this.scene.getSpatialChunking()?.cellSize ?? 0, {
+                        visibility: (b) => (hasVisibilityFiltering ? this._batchVisibility.classify(b, this._visibilityVersion, options.hiddenIds, options.isolatedIds) : 'all'),
+                        alpha: (b) => alphaForBatch(b, b.color[3]), colorOverrides, colorOverrideGen, emphasize: options.emphasizeOverrides === true, xrayActive: xray.active,
+                        forEachPiece: (visit) => this.scene.forEachFlatMeshData(visit), requestRender: () => this.requestRender(),
+                    });
+                for (let batch of loopBatches) {
                     // Frustum culling: skip batches entirely outside the camera view
                     if (batch.bounds) {
                         if (!isRteAabbVisible(frustum, batch.bounds, rteCullCamera)) {
@@ -2364,49 +2319,33 @@ export class Renderer {
                         }
                     }
 
-                    const alpha = alphaForBatch(batch, batch.color[3]);
+                    // Skip a completely hidden batch; a partly hidden one keeps its visible part.
+                    const vis = hasVisibilityFiltering ? this._batchVisibility.classify(batch, this._visibilityVersion, options.hiddenIds, options.isolatedIds) : 'all';
+                    if (vis === 'none') continue;
+                    const part = vis === 'all' ? null : vis;
+                    const alpha = alphaForBatch(part ?? batch, batch.color[3]);
                     const nativelyTransparent = alpha < 0.99;
 
-                    // Check visibility
-                    if (hasVisibilityFiltering) {
-                        const vis = getBatchVisibility(batch);
-                        if (!vis.visible) continue; // Skip completely hidden batches
-
-                        // Handle partially visible batches - create sub-batches instead of individual meshes
-                        if (!vis.fullyVisible) {
-                            // The visible subset was computed once for this
-                            // visibility epoch (cached) — reuse it, don't rebuild.
-                            const visibleIds = vis.visibleIds;
-                            if (visibleIds && visibleIds.size > 0 && !pushAlphaSplit(batch, visibleIds)) {
-                                pushVisibleAsPartial(batch, visibleIds, nativelyTransparent);
-                            }
-                            // A COLD parent has no CPU meshData, so the sub-batch above comes back
-                            // empty: restore its pieces (only them, the subset never reads the parent's
-                            // GPU buffers, #9050) or the subset stays missing under hide/isolate forever.
-                            // Missing this frame, so it counts as not resident (#9227).
-                            if (batch.gpuResident === false && this.scene.requestBatchPieces(batch)) frameBatchesNotResident++;
-                            continue; // Don't add batch to render list
-                        }
-                    }
-
-                    // Fully visible but drawn as sub-batches: per X-Ray alpha (#4129), or
-                    // promoted/remaining for a transparent batch with mixed overrides
-                    // (#677). Decided before the residency step, since the subsets never
-                    // read the parent's own GPU buffers (#9136).
-                    const split = pushWholeSplit(partialRequests, this.scene, batch, nativelyTransparent);
+                    // Drawn as sub-batches: per X-Ray alpha (#4129), or promoted/remaining
+                    // for a transparent batch with mixed overrides (#677). Decided before
+                    // the residency step, since the subsets never read the parent's own
+                    // GPU buffers (#9136).
+                    const split = pushSplit(partialRequests, this.scene, batch, nativelyTransparent, part?.visibleIds ?? null);
                     if (split !== 'whole') { if (split === 'pieces') frameBatchesNotResident++; continue; }
+                    // Never drawn with its hidden entities: without the GPU test it stays out.
+                    if (part && !canFilterOnGpu(batch, this._gpuVisibility)) { frameBatchesNotResident++; continue; }
 
                     // Drawn from its OWN GPU buffers. An evicted batch (residency budget,
                     // #1682 phase 3a) is skipped for a frame while its rebuild is queued;
-                    // an evicted parent past the rebuild cap draws last frame's subsets (#9227).
+                    // an evicted parent past the rebuild cap draws last frame's subsets (#9227),
+                    // under this frame's visibility test when it is partly hidden.
                     const whole = batchForWholeDraw(this.scene, batch, device, this.pipeline);
                     if (!whole) {
                         frameBatchesNotResident++;
-                        for (const sub of this.scene.subsetStandIns(batch)) (shouldRouteBatchTransparent(alphaForBatch(sub, sub.color[3]), sub.expressIds, colorOverrides) ? transparentBatches : opaqueBatches).push(sub);
+                        for (const sub of this.scene.subsetStandIns(batch)) route(sub, part);
                         continue;
                     }
-                    batch = whole; // an evicted parent's rebuild when its subset was on screen (#9050)
-                    (shouldRouteBatchTransparent(alpha, batch.expressIds, colorOverrides) ? transparentBatches : opaqueBatches).push(batch);
+                    route(whole, part); // an evicted parent's rebuild when its subset was on screen (#9050)
                 }
 
                 // Retire the alpha-split slots this frame's classification did NOT
@@ -2466,7 +2405,7 @@ export class Renderer {
                     tpl[32] = batch.color[0];
                     tpl[33] = batch.color[1];
                     tpl[34] = batch.color[2];
-                    tpl[35] = alphaForBatch(batch, batch.color[3]);
+                    tpl[35] = alphaForBatch(drawnPart(batch), batch.color[3]);
                     packMeshMaterial(tpl, batch.color[3], batch.finish);
 
                     // Rebase batch-local vertices; translation lives in tpl[28..30].
@@ -2478,7 +2417,7 @@ export class Renderer {
                     // fragment work (section/shadow); vertex projection uses
                     // this f64-subtracted high/low origin instead.
                     if (!relativeToEyeFrame.tryPackDrawableOrigin(o ?? [0, 0, 0], tpl, MESH_UNIFORM_OFFSET.drawableDelta)) return;
-                    tplFlags[0] |= MESH_FLAG_RTE_DRAWABLE;
+                    tplFlags[0] = (tplFlags[0] | MESH_FLAG_RTE_DRAWABLE) & ~MESH_FLAG_ENTITY_VISIBILITY | (filtered.has(batch) ? MESH_FLAG_ENTITY_VISIBILITY : 0);
 
                     // Quantized dequantization params (issue #1682 phase 6);
                     // zeroed for f32 batches (their pipelines ignore them).
@@ -2504,7 +2443,7 @@ export class Renderer {
                         pass.drawIndexed(batch.lod1IndexCount!);
                         frameBatchesAtLod1++;
                     } else {
-                        pass.setIndexBuffer(batch.indexBuffer, 'uint32');
+                        pass.setIndexBuffer(batch.indexBuffer, batch.indexFormat ?? 'uint32');
                         pass.drawIndexed(batch.indexCount);
                     }
                     frameDrawCalls++;
@@ -2518,9 +2457,10 @@ export class Renderer {
                 const opaqueMode = (instancedDiscards?: boolean) => resolveOpaqueDrawMode({ perspective: this.camera.getProjectionMode() !== 'orthographic',
                     clipping: sectionPlaneData?.enabled === true || tplClipBit !== 0 || extraClipPlanes.length > 0, edges: needsObjectIdPass, instancedDiscards });
                 const flatMode = opaqueMode();
+                const filteredMode = { ...flatMode, discardFree: false }; // the visibility test discards
                 const pipeFor = (batch: typeof allBatchedMeshes[0], kind: 'opaque' | 'transparent'): GPURenderPipeline => {
-                    if (kind === 'opaque') return this.pipeline!.opaquePipeline(batch.quantized ? 'quantized' : 'flat', flatMode);
-                    const ghost = xray.isGhostBatch(batch) ? this.pipeline!.getGhostPipeline(!!batch.quantized, () => this.requestRender()) : null;
+                    if (kind === 'opaque') return this.pipeline!.opaquePipeline(batch.quantized ? 'quantized' : 'flat', filtered.has(batch) ? filteredMode : flatMode);
+                    const ghost = xray.isGhostBatch(drawnPart(batch)) ? this.pipeline!.getGhostPipeline(!!batch.quantized, () => this.requestRender()) : null;
                     return ghost ?? (batch.quantized ? this.pipeline!.getQuantizedPipelineVariant('transparent') : null) ?? this.pipeline!.getTransparentPipeline();
                 };
 
@@ -2533,6 +2473,21 @@ export class Renderer {
                 for (const batch of opaqueBatches) {
                     usePipeline(pipeFor(batch, 'opaque'));
                     renderBatch(batch, true);
+                }
+                if (this.drawStream.engaged) {
+                    tplFlags[0] = (tplFlags[0] | MESH_FLAG_RTE_DRAWABLE) & ~MESH_FLAG_ENTITY_VISIBILITY;
+                    this.uniformOverrideU32.fill(0);
+                    const ortho = this.camera.getProjectionMode() === 'orthographic';
+                    frameStream = this.drawStream.encode(tpl, relativeToEyeFrame, {
+                        pass, mode: flatMode, allowBundles: !ortho, ortho: ortho && this.pipeline.visibility.getBinding() ? this.pipeline.visibility : undefined,
+                        visible: (min, max) => isRteAabbVisible(frustum, { min, max }, rteCullCamera),
+                        projectedPx: (min, max) => (cullCam ? projectedAabbRadiusPx(min, max, cullCam) : Infinity),
+                        contribPx: contribThresholdPx, lodPx: lodScreenPx, eye: this.camera.getPosition(), interacting,
+                        projection: { ortho, orthoHalfHeight: this.camera.getOrthoSize(), fovYRadians: this.camera.getFOV(), viewportHeightPx: this.canvas.height / this.pixelRatio },
+                    }, (b) => this.scene.recordBatchDrawn(b));
+                    frameDrawCalls += frameStream.draws; frameBatchesDrawn += frameStream.draws;
+                    // A bundle replay (and the stream's own binds) reset the pass state the code below assumes.
+                    pass.setPipeline(boundPipeline); pass.setBindGroup(1, this.pipeline.getEnvironmentBindGroup()); bindSectionExclusions(pass, device, 2);
                 }
 
                 // GPU-instancing pass — repeated geometry collated by the producer
@@ -2557,7 +2512,7 @@ export class Renderer {
                 // this is where interactive frame cost lives (issue #1682).
                 let visibleInstanced: InstancedTemplateGPU[] | readonly InstancedTemplateGPU[] =
                     instancedTemplates;
-                if (instancedTemplates.length > 0) {
+                if (instancedTemplates.length > 0 && !instancePool) {
                     const kept: InstancedTemplateGPU[] = [];
                     for (const it of instancedTemplates) {
                         if (it.bounds) {
@@ -2583,7 +2538,18 @@ export class Renderer {
                 // Per-template instance runs inside this frame's RTE envelope,
                 // shared by the opaque and transparent instanced sub-passes.
                 let visibleInstancedRuns: (readonly InstanceRun[])[] = [];
-                if (visibleInstanced.length > 0) {
+                if (instancePool) {
+                    // Same uniforms, pipeline and shaders as below; the pool binds each
+                    // draw group's compacted region and draws it indirect.
+                    this.pipeline.writeRawUniforms(tpl, MESH_FLAG_RTE_DRAWABLE | 0x4);
+                    usePipeline(this.pipeline.opaquePipeline('instanced', opaqueMode(this.scene.instancedMayDiscard())));
+                    pass.setBindGroup(0, this.pipeline.getBindGroup());
+                    pass.setBindGroup(1, this.pipeline.getEnvironmentBindGroup());
+                    bindSectionExclusions(pass, device, 2);
+                    const draws = instancePool.draw(pass);
+                    frameDrawCalls += draws;
+                    frameInstancedDrawn += draws;
+                } else if (visibleInstanced.length > 0) {
                     visibleInstancedRuns = uploadInstancedRteDeltas(device, visibleInstanced, relativeToEyeFrame.getCameraWorld());
                     // Opaque instanced pass. flags.x bit 2 marks "instanced pass" so the
                     // shader routes per-instance opacity: opaque (or selected) occurrences
@@ -2650,7 +2616,7 @@ export class Renderer {
                         // world origin.
                         tpl[28] = tm.origin[0]; tpl[29] = tm.origin[1]; tpl[30] = tm.origin[2];
                         if (!relativeToEyeFrame.tryPackDrawableOrigin(tm.origin, tpl, MESH_UNIFORM_OFFSET.drawableDelta)) continue;
-                        tplFlags[0] |= MESH_FLAG_RTE_DRAWABLE;
+                        tplFlags[0] = (tplFlags[0] | MESH_FLAG_RTE_DRAWABLE) & ~MESH_FLAG_ENTITY_VISIBILITY; // filtered on the CPU above
                         tpl[32] = txOverride ? txOverride[0] : tm.color[0];
                         tpl[33] = txOverride ? txOverride[1] : tm.color[1];
                         tpl[34] = txOverride ? txOverride[2] : tm.color[2];
@@ -2675,13 +2641,8 @@ export class Renderer {
                     }
                 }
 
-                // PERFORMANCE FIX: Render partially visible batches as sub-batches (not individual meshes!)
-                // This is the key optimization: instead of 10,000+ individual draw calls,
-                // we create cached sub-batches with only visible elements and render them as single draw calls.
-                // We also collect resolved opaque sub-batches so the section cap pass below can
-                // include them in its parity count — otherwise hidden/isolated opaque geometry
-                // would show open, un-capped cut holes.
-                const opaqueSubBatches: typeof allBatchedMeshes = [];
+                // The X-Ray and promotion sub-batches: cached subsets of a batch's
+                // pieces, each drawn with one call.
                 if (partiallyVisibleBatches.length > 0) {
                     // Transparent sub-batches are deferred to a second pass below:
                     // they write no depth, so an opaque sub-batch drawn after one
@@ -2707,7 +2668,7 @@ export class Renderer {
                             // lens/Pset colour override, so the colour table paints it (#6076).
                             const isTransparent = shouldRouteBatchTransparent(
                                 alphaForBatch(subBatch, color[3]),
-                                subBatch.expressIds,
+                                batchEntities(subBatch),
                                 colorOverrides,
                             );
                             if (isTransparent) {
@@ -2720,7 +2681,6 @@ export class Renderer {
                             // so culling punched holes (wall read hollow). See the
                             // full-batch path above.
                             usePipeline(pipeFor(subBatch, 'opaque'));
-                            opaqueSubBatches.push(subBatch);
                             renderBatch(subBatch, true); // one draw call for the whole subset
                         }
                     }
@@ -2751,7 +2711,7 @@ export class Renderer {
                 // occurrence translucent (otherwise zero cost). flags.x bit 3 flips the
                 // shader's opacity routing so only translucent occurrences draw here.
                 const instancedTransparentPipeline = this.pipeline.getInstancedTransparentPipeline();
-                const instancedTransparent = visibleInstanced.length > 0 && this.scene.hasTransparentInstances() && instancedTransparentPipeline !== null;
+                const instancedTransparent = (instancePool !== null || visibleInstanced.length > 0) && this.scene.hasTransparentInstances() && instancedTransparentPipeline !== null;
                 holdGlass(transparentBatches.length + transparentMeshes.length > 0 || instancedTransparent);
                 if (instancedTransparent) {
                     this.pipeline.writeRawUniforms(tpl, MESH_FLAG_RTE_DRAWABLE | 0x4 | 0x8);
@@ -2759,7 +2719,8 @@ export class Renderer {
                     pass.setBindGroup(0, this.pipeline.getBindGroup());
                     pass.setBindGroup(1, this.pipeline.getEnvironmentBindGroup());
                     bindSectionExclusions(pass, device, 2);
-                    for (const [i, it] of visibleInstanced.entries()) {
+                    if (instancePool) frameDrawCalls += instancePool.draw(pass);
+                    else for (const [i, it] of visibleInstanced.entries()) {
                         pass.setVertexBuffer(0, it.vertexBuffer);
                         pass.setVertexBuffer(1, it.instanceBuffer);
                         pass.setVertexBuffer(INSTANCED_RTE_DELTA_SLOT, it.rteDeltas.buffer);
@@ -2813,44 +2774,12 @@ export class Renderer {
                     }
                 }
 
-                // Ensure selected meshes have uniform buffers and bind groups
-                for (const mesh of selectedMeshes) ensureMeshUniform(device, this.pipeline, mesh);
-
                 // Render selected meshes with highlight LAST (on top of transparent geometry too)
                 glass?.markGlassEnd();
-                for (const mesh of selectedMeshes) {
-                    if (!mesh.bindGroup || !mesh.uniformBuffer) {
-                        continue;
-                    }
-
-                    tpl.set(viewProj, 0);
-                    tpl.set(mesh.transform.m, 16);
-                    tpl[32] = mesh.color[0]; tpl[33] = mesh.color[1];
-                    tpl[34] = mesh.color[2]; tpl[35] = mesh.color[3];
-                    packMeshMaterial(tpl, mesh.color[3], mesh.finish ?? mesh.material);
-                    packSectionPlaneLanes(sectionPlaneData, tpl);
-                    tplFlags[0] = 1; // isSelected
-                    tplFlags[1] =
-                        (sectionPlaneData?.enabled ? 1 : 0) |
-                        (options.sectionPlane?.flipped ? 2 : 0) |
-                        tplClipBit;
-                    tplFlags[2] = 0;
-                    tplFlags[3] = 0;
-                    packRteFragmentSpace(relativeToEyeFrame, sectionPlaneData, options.clipBox, tpl, extraClipPlanes);
-                    const selectedOrigin = mesh.rteOrigin ?? [mesh.transform.m[12], mesh.transform.m[13], mesh.transform.m[14]] as [number, number, number];
-                    if (!relativeToEyeFrame.tryPackDrawableOrigin(selectedOrigin, tpl, MESH_UNIFORM_OFFSET.drawableDelta)) continue;
-                    tplFlags[0] |= MESH_FLAG_RTE_DRAWABLE;
-
-                    this.uniformOverrideU32[0] = mesh.expressId;
-                    if (!stageBorrowedSelection(mesh, tpl)) device.queue.writeBuffer(mesh.uniformBuffer, 0, tpl);
-
-                    usePipeline(isBorrowedSelection(mesh) ? this.pipeline.getTexturedSelectionPipeline() : this.pipeline.getSelectionPipeline());
-                    pass.setBindGroup(0, mesh.bindGroup);
-                    pass.setVertexBuffer(0, mesh.vertexBuffer);
-                    pass.setIndexBuffer(mesh.indexBuffer, 'uint32');
-                    pass.drawIndexed(mesh.indexCount, 1, 0, 0, 0);
-                    frameDrawCalls++;
-                }
+                frameDrawCalls += drawSelectionHighlights(selectedMeshes, { pass, device, pipeline: this.pipeline, usePipeline, tpl, tplFlags, overrideU32: this.uniformOverrideU32,
+                    viewProj, section: sectionPlaneData, sectionFlipped: options.sectionPlane?.flipped === true, clipBit: tplClipBit, clipBox: options.clipBox, extraPlanes: extraClipPlanes,
+                    relativeToEyeFrame, onBatchDrawn: (batch) => this.scene.recordBatchDrawn(batch) });
+                this.uniformOverrideU32.fill(0);
             } else {
                 // Fallback: render individual meshes (only when no batches exist)
                 // Render opaque meshes with per-mesh bind groups
@@ -2941,15 +2870,20 @@ export class Renderer {
             const hoverId = hovered && !options.hiddenIds?.has(hovered.id)
                 && (!hasIsolatedFilter || options.isolatedIds!.has(hovered.id)) ? hovered.id : null;
             const hoverModel = hovered?.modelIndex;
-            const hoverPieces = hoverId != null && !selectedMeshesForMask.some((m) => matchesHoveredMesh(m, hoverId, hoverModel))
+            const { ownHover, needsBatches } = hoverSources(selectedMeshesForMask, hoverId, hoverModel);
+            // From the colour batches when they hold all of it (#10264 S3), else copies of its pieces.
+            const hoverBatches = needsBatches && hoverId != null ? this.hoverBatches.resolve(this.scene, hoverId, hoverModel, { device, pipeline: this.pipeline, onPipelineReady: () => this.requestRender(), entityIndex: this.drawStream.highlightIndex }) : null;
+            for (const batch of hoverBatches ?? []) this.scene.recordBatchDrawn(batch);
+            const hoverPieces = ownHover && hoverId != null && !hoverBatches
                 ? this.guardedHighlightUpload('hover highlight', () => this.hoverMeshes.resolve(device, hoverId, hoverModel, () => this.scene.getMeshDataPieces(hoverId, hoverModel), (m) => this.individualMeshFrame(m), this.scene.getPickGeometryRevision())) ?? []
                 : (this.hoverMeshes.release(), []);
             const selectionOutline = buildSelectionOutlineFrame({
                 uniformBufferSize: this.pipeline.getUniformBufferSize(), viewProj, relativeToEyeFrame,
                 section: sectionPlaneData, sectionFlipped: options.sectionPlane?.flipped, clipBox: options.clipBox, extraPlanes: extraClipPlanes,
-                selectedMeshes: selectedMeshesForMask, hoverPieces, hoveredId: hoverId, selectedModelIndex: hoverModel,
+                selectedMeshes: selectedMeshesForMask, hoverPieces, hoverBatches, hoveredId: hoverId, selectedModelIndex: hoverModel,
                 instancedTemplates: this.scene.getInstancedTemplates(),
                 instancedHovered: hoverId != null ? this.scene.getInstancedTemplatesOf(hoverId, hoverModel) : [],
+                instancePool,
             });
             // Created lazily like the sky/shadow passes; each pass inside is too.
             this.postPasses ??= new PostPassChain(this.device, this.pipeline.getSampleCount(), this.pipeline.getBindGroupLayout());
@@ -2968,7 +2902,7 @@ export class Renderer {
                 pixelRatio: this.pixelRatio,
                 // EDL only when point clouds are loaded and the user enabled it.
                 edl: this.edlOptions.enabled && this.pointCloudRenderer?.hasAssets() ? this.edlOptions : null,
-                selectionOutline, geometricVisibility: this.pipeline.visibility.getBinding(),
+                selectionOutline, geometricVisibility: this.pipeline.visibility.getBinding(), entityColorTable: this.scene.getEntityColorTable().getBuffer(),
             });
 
             // Internal opt-in witness metadata: snapshot synchronously alongside the submitted copy.
@@ -3001,6 +2935,7 @@ export class Renderer {
                 instancedFrustumCulled: frameInstancedFrustumCulled,
                 instancedContributionCulled: frameInstancedContributionCulled,
                 timestamp: performance.now(), cpuMs: performance.now() - frameStart - textureWaitMs,
+                stream: frameStream,
             };
 
             // GPU residency budget (issue #1682 phase 3a): evict least-recently
@@ -3145,6 +3080,28 @@ export class Renderer {
     }
 
     /**
+     * Released CPU geometry read back from local storage for the next raycast
+     * and snap (#10264). `raycastScene` / `raycastSceneMagnetic` test these
+     * pieces beside the resident ones, under the same visibility and section
+     * clip. Pass `null` to clear. Place them in the current model frame first
+     * (`getScene().placeAppearanceSource`); the caller keeps them alive.
+     *
+     * With `at`, the pieces answer only the ray through that canvas point under
+     * the current view (`readbackRaycastCovers`): a neighbourhood is not the
+     * whole scene, so another ray could pass an unfed front surface.
+     */
+    setReadbackRaycastMeshes(meshes: readonly MeshData[] | null, at?: { x: number; y: number }): void {
+        this.raycastEngine.setReadbackMeshes(meshes, at);
+    }
+
+    /** Whether the readback pieces were prepared for the ray at (x, y) under the current view. */
+    readbackRaycastCovers(x: number, y: number): boolean {
+        return this.raycastEngine.readbackCovers(x, y);
+    }
+    /** The view readback coverage is stamped with: capture it before the pick, install only while it is unchanged. */
+    readbackRaycastViewKey(): string { return this.raycastEngine.readbackViewKey(); }
+
+    /**
      * Raycast with magnetic edge snapping: the "stick and slide along edges" experience.
      *
      * Note: x, y are CSS pixel coordinates relative to the canvas element.
@@ -3166,6 +3123,7 @@ export class Renderer {
 
     /** Invalidate BVH cache (call when geometry changes). */
     invalidateBVHCache(): void { this.raycastEngine.invalidateBVHCache(); }
+
     /** True when the flat index is warm; ray-hit instance geometry may still materialize per ray. */
     isRaycastCacheWarm(): boolean { return this.raycastEngine.isCacheWarm(); }
 
@@ -3235,6 +3193,34 @@ export class Renderer {
 
     getCamera(): Camera {
         return this.camera;
+    }
+
+    /** Diagnostic (#10264): every CPU geometry array the scene and the raycast index reference; views only. */
+    visitCpuGeometry(visit: CpuGeometryVisitor): void { this.scene.visitCpuGeometry(visit); this.raycastEngine.visitCpuGeometry(visit); }
+
+    /**
+     * Flat-batch draw stream (`draw-stream.ts`): node-culled render bundles,
+     * shared geometry arenas, far-field HLOD proxies and the entity -> batch
+     * highlight index. Off by default. Set before geometry streams in: the
+     * arena needs COPY_SRC on batch buffers at upload. A changed config drops
+     * the current stream, which rebuilds on the next settled frame.
+     */
+    setDrawStreamConfig(config: Readonly<DrawStreamConfig>): void {
+        this.drawStream.configure(config);
+        this.scene.setDrawStreamArena(config.stream && config.arena);
+        this.requestRender();
+    }
+
+    /**
+     * GPU-driven instancing (`gpu-instance-pool.ts`): occurrence tables, a
+     * compute cull and indirect draws instead of per-template CPU culls and
+     * repacks. Off by default. Set before instanced shards stream in;
+     * templates already uploaded stay on the per-template path until the
+     * scene is cleared.
+     */
+    setGpuInstancing(enabled: boolean): boolean {
+        this.requestRender();
+        return this.scene.setGpuInstancing(enabled); // false: refused while instanced geometry exists
     }
 
     /** MEASURED external surface, not the 4400-line `Scene`: widening `SceneContents` is a published-API decision, not a detail — see `scene-contents.ts`. */
@@ -3565,11 +3551,12 @@ export class Renderer {
 
         this.postPasses?.destroy();
         this.postPasses = null;
-        this.hoverMeshes.release();
+        this.hoverMeshes.release(); this.hoverBatches.clear();
         this.skyPass?.destroy();
         this.skyPass = null;
         this.shadowPass?.destroy();
         this.shadowPass = null;
+        this.drawStream.destroy(); // its records, arenas, bundles and proxies belong to the old device
 
         // Section-plane gizmo, 2D section overlay and the symbolic annotation
         // pipelines — see RendererOverlays.destroy().

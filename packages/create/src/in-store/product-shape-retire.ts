@@ -2,23 +2,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-/** Retire a product shape once no product points at it any more: after an
- * edit replaced the product's Representation, or after the product itself was
- * removed. IfcProductDefinitionShape.ShapeOfProduct is mandatory, and an
- * IfcShapeRepresentation belongs to exactly one product shape or map
- * (IfcShapeModel WR11), so leaving the old records behind exports a file
- * that fails schema validation. Only the representation structure is walked,
- * through its known reference slots, and a record anything live still
- * references is retained: shared type maps, contexts and shared styles stay.
- * An item referenced only by the IfcStyledItems that colour it goes with
- * them, and so does a style chain nothing else uses. */
+/** ShapeOfProduct is mandatory and a shape representation has exactly one owner (IfcShapeModel WR11),
+ * so a product shape nothing points at any more is removed with the representation records only it reached. */
 import type { IfcDataStore } from '@ifc-lite/parser';
 import type { StoreEditor } from '@ifc-lite/mutations';
 import { effectiveReferencers } from '@ifc-lite/export';
 import { AnchorEntityReader } from './resolve-anchor.js';
 import { refId } from './host-geometry-frame.js';
 
-/** Reference slots that lead to records this structure owns, by type. */
 const OWNED_SLOTS: Readonly<Record<string, readonly number[]>> = {
   IFCPRODUCTDEFINITIONSHAPE: [2],
   IFCSHAPEREPRESENTATION: [3],
@@ -39,21 +30,15 @@ function slotRefs(value: unknown): number[] {
   return (Array.isArray(value) ? value : [value]).map(refId).filter((id): id is number => id !== null);
 }
 
-/**
- * Delete `shapeId` and the representation records only it reached, if no
- * live record references them. Returns the removed ids (empty when the shape
- * is still in use). Call it inside the same atomic edit that re-pointed or
- * removed the product.
- */
+/** Removes `shapeId` and what only it reached, inside the edit that re-pointed or removed the product; returns the removed ids. */
 export function retireProductShape(store: IfcDataStore, editor: StoreEditor, shapeId: number): number[] {
   const view = editor.getMutationView();
   const reader = new AnchorEntityReader(store, view);
   const removed: number[] = [];
   const pending = [shapeId];
   let work = 0;
-  while (pending.length > 0) {
+  for (let id = pending.shift(); id !== undefined; id = pending.shift()) {
     if (++work > RETIRE_WORK_LIMIT) throw new Error(`Retiring product shape #${shapeId} exceeds its work budget`);
-    const id = pending.shift()!;
     const entity = reader.entity(id);
     if (!entity || entity.names.includes('GlobalId')) continue;
     const referencers = effectiveReferencers(store, view)(id);

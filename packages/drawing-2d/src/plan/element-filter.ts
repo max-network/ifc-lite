@@ -14,7 +14,7 @@
  */
 
 import type { MeshData } from '@ifc-lite/geometry';
-import { geometryClassOf, isPlacedGeometryClass, isTypeLibraryGeometryClass, GEOM_CLASS_INSTANCED_TYPE } from '@ifc-lite/geometry/geometry-class';
+import { geometryClassOf, isModelViewGeometryClass, isPlacedGeometryClass } from '@ifc-lite/geometry/geometry-class';
 import { isFeatureElementType } from '../feature-elements.js';
 
 export interface DrawingElementFilter {
@@ -57,9 +57,7 @@ export function selectDrawableMeshes<T extends MeshData>(meshes: readonly T[], f
   const include = lowerSet(filter.includeTypes);
   return meshes.filter((mesh) => {
     const geometryClass = geometryClassOf(mesh);
-    if (!filter.includeTypeLibrary && isTypeLibraryGeometryClass(geometryClass)) {
-      if (geometryClass === GEOM_CLASS_INSTANCED_TYPE || hasPlaced) return false;
-    }
+    if (!filter.includeTypeLibrary && !isModelViewGeometryClass(geometryClass, hasPlaced)) return false;
     if (filter.excludeIds?.has(mesh.expressId)) return false;
     const type = (mesh.ifcType ?? '').toLowerCase();
     if (filter.excludeFeatureElements && isFeatureElementType(type)) return false;

@@ -17,6 +17,7 @@ import { decodeSceneSnapshot, encodeSceneSnapshot, type SceneSnapshot } from './
 import { reorderSnapshotPieces } from './scene-snapshot-batches.js';
 import { PartialBatchRequests } from './partial-batch-requests.js';
 import { XRayAlpha } from './xray-alpha.js';
+import { classifyBatch } from './batch-visibility.js';
 
 (globalThis as unknown as { GPUBufferUsage: Record<string, number> }).GPUBufferUsage = { VERTEX: 32, INDEX: 16, UNIFORM: 64, COPY_DST: 8, COPY_SRC: 4, STORAGE: 128 };
 
@@ -266,14 +267,14 @@ describe('finished-scene snapshot', () => {
     const drawnIndices = (visible: Set<number> | null, batch = glass): number => {
       const requests = new PartialBatchRequests(lens, new XRayAlpha({}, new Set()), (b) => scene.canPartitionBatch(b));
       let drawn = 0;
-      if (visible) requests.pushVisible(batch, visible, true);
-      else if (!requests.pushWholeSplit(batch, true)) drawn += batch.indexCount;
+      // Not split: drawn whole, a partly hidden batch under the GPU visibility test (#10264 S2).
+      if (!requests.pushSplit(batch, true, visible)) drawn += batch.indexCount;
       for (const r of requests.items) drawn += scene.getOrCreatePartialBatch(r.sourceBatchKey, r.colorKey, r.visibleIds, device, pipeline)?.indexCount ?? 0;
       return drawn;
     };
     assert.strictEqual(scene.isSceneSnapshotHydrating(), true);
     assert.strictEqual(drawnIndices(null), 9, 'fully visible: the whole batch, once');
-    assert.strictEqual(drawnIndices(new Set([4, 5])), 9, 'under hide: the whole batch, once, until the pieces arrive');
+    assert.strictEqual(drawnIndices(new Set([4, 5])), 9, 'under hide: the whole batch, once, its hidden entity discarded on the GPU');
 
     // A fragment streamed in meanwhile has its own pieces, but every slot is still served
     // the bucket's whole batch: splitting it would draw that batch once per subset.
@@ -382,3 +383,47 @@ describe('finished-scene snapshot', () => {
     assert.strictEqual(captured, false);
   });
 });
+
+// #10653: the secondary vertex-lane ids of a colour-merged piece are batch metadata, so a scene
+// restored from a snapshot, or one that released its CPU pieces, still classifies by them.
+describe('colour-merged lane ids survive finalize, rebuild, snapshot and release (#10653)', () => {
+  beforeEach(() => { written = []; destroyed = 0; failCreateAfter = -1; });
+  const merged = () => ({ ...triangle(1, 0), entityIds: new Uint32Array([1, 2, 2]) }) as MeshData;
+  const holding = (scene: Scene) => scene.getBatchedMeshes().find((b) => b.expressIds.includes(1))!;
+
+  it('keeps laneIds through the real finalize and a snapshot round trip, and classifies by them after release', async () => {
+    const device = stubDevice();
+    const snapshot = (await captureScene([merged(), triangle(3, 4)], device))!;
+    assert.ok(snapshot, 'the merged scene is captured');
+    assert.deepStrictEqual(holding(lastFinalized).laneIds, [2], 'finalize records the secondary');
+    assert.strictEqual(lastFinalized.canPartitionBatch(holding(lastFinalized)), false);
+
+    const restored = freshScene();
+    assert.ok(restored.adoptSceneSnapshot(await roundTrip(snapshot), device, pipeline));
+    const batch = holding(restored);
+    assert.deepStrictEqual(batch.laneIds, [2], 'the snapshot carries it');
+    restored.releaseGeometryData();
+    assert.strictEqual(restored.getMeshDataPieces(2), undefined, 'no CPU pieces left to consult');
+    assert.notStrictEqual(classifyBatch(batch, new Set([2]), null), 'all');
+    assert.notStrictEqual(classifyBatch(batch, new Set([1]), null), 'none');
+  });
+
+  it('marks a batch colour-merged when a piece hosts another piece\'s entity (review on #10785)', async () => {
+    const device = stubDevice();
+    await captureScene([merged(), triangle(2, 2)], device);
+    assert.deepStrictEqual(holding(lastFinalized).laneIds, [2], 'entity 2 also lives in piece 1');
+  });
+
+  it('keeps laneIds when an edit rebuilds the batch through createSceneBatch', async () => {
+    const device = stubDevice();
+    await captureScene([merged(), triangle(3, 1)], device);
+    const scene = lastFinalized;
+    const before = holding(scene);
+    assert.ok(scene.removeMeshesForEntity(3), 'the edit dirties the shared bucket');
+    scene.rebuildPendingBatches(device, pipeline);
+    const after = holding(scene);
+    assert.notStrictEqual(after, before, 'rebuilt');
+    assert.deepStrictEqual(after.laneIds, [2]);
+  });
+});
+

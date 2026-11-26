@@ -30,8 +30,8 @@ import { useViewerStore } from '@/store';
 import { hasRetainedShapeOnlyModel, RETAINED_SHAPE_ONLY_REASON } from '@/store/retainedGeometry';
 import { trackExportCompleted } from '@/lib/analytics';
 import { toast } from '@/components/ui/toast';
-import { buildKmzForModel, kmzSuggestsAbsoluteAltitude, type KmzBuildError } from '@/lib/geo/kmz-export';
-import type { InstancedModelRange } from '@/utils/instancedExport';
+import { buildKmzForModel, kmzSuggestsAbsoluteAltitude, modelHasGeoreference, type KmzBuildError } from '@/lib/geo/kmz-export';
+import { instancedModelRangeOf, type InstancedModelRange } from '@/utils/instancedExport';
 import type { GeometryResult } from '@ifc-lite/geometry';
 import type { IfcDataStore } from '@ifc-lite/parser';
 import type { KmzAltitudeMode } from '@/lib/geo/kmz-exporter';
@@ -40,6 +40,8 @@ import { useTranslation } from '@/i18n';
 import { exportableModels } from '@/lib/export/capture-export';
 import type { TranslationKey } from '@/i18n';
 import { ExportDialogShell, type ExportDialogShellResult } from './ExportDialogShell';
+
+import { ExportGeorefNotice } from './ExportGeorefNotice';
 
 interface KmzExportDialogProps {
   surface: ExportSurface;
@@ -72,8 +74,7 @@ export function KmzExportDialog({ surface, trigger }: KmzExportDialogProps) {
   // change.
   const [open, setOpenMirror] = useState(false);
 
-  // Models that have both geometry and a parsed store (georef is checked at export
-  // time so we don't scan every store on every render). Falls back to the legacy
+  // Models that have both geometry and a parsed store. Falls back to the legacy
   // single-model slot when no federated model is registered (mirrors GLBExportDialog).
   const modelList = useMemo(() => {
     const list: {
@@ -92,8 +93,8 @@ export function KmzExportDialog({ surface, trigger }: KmzExportDialogProps) {
         // Every model can carry GPU-instanced occurrences since #2255
         // (2026-08-06) — scope `withInstancedMeshes` to THIS model's bracket so
         // a federation of N models doesn't splice every other model's instanced
-        // entities into this one's KMZ (#2865/#2878 follow-up).
-        instancedModelRange: { idOffset: m.idOffset ?? 0, maxExpressId: m.maxExpressId ?? 0 },
+        // entities into this one's KMZ (#2865/#2878 follow-up), nor an overlapping-id collab model's (#10695).
+        instancedModelRange: instancedModelRangeOf(m.id, models),
       }));
     if (list.length === 0 && legacyGeometryResult && legacyDataStore) {
       // The legacy single-model slot is provably the sole model loaded — nothing
@@ -136,7 +137,7 @@ export function KmzExportDialog({ surface, trigger }: KmzExportDialogProps) {
       return kmzSuggestsAbsoluteAltitude({
         geometryResult: selectedModel.geometryResult,
         dataStore: selectedModel.dataStore,
-        mutations: selectedModel.id === '__legacy__' ? undefined : georefMutations.get(selectedModel.id),
+        mutations: georefMutations.get(selectedModel.id),
       });
     } catch (err) {
       // A hint must never break the dialog — log and fall back to no hint.
@@ -160,7 +161,7 @@ export function KmzExportDialog({ surface, trigger }: KmzExportDialogProps) {
         geometryResult: selectedModel.geometryResult,
         instancedModelRange: selectedModel.instancedModelRange,
         dataStore: selectedModel.dataStore,
-        mutations: selectedModelId === '__legacy__' ? undefined : georefMutations.get(selectedModelId),
+        mutations: georefMutations.get(selectedModel.id),
         name: baseName,
         altitudeMode,
       });
@@ -186,6 +187,10 @@ export function KmzExportDialog({ surface, trigger }: KmzExportDialogProps) {
     }
   }, [selectedModel, selectedModelId, georefMutations, altitudeMode, t, surface]);
 
+  const missingGeoref = useMemo(() => open && !!selectedModel && !modelHasGeoreference(
+    selectedModel.dataStore, georefMutations.get(selectedModel.id),
+  ), [open, selectedModel, georefMutations]);
+
   const filenamePreview = selectedModel ? modelExportFilename(selectedModel.name, 'kmz') : undefined;
 
   return (
@@ -209,11 +214,13 @@ export function KmzExportDialog({ surface, trigger }: KmzExportDialogProps) {
       successTitle={t('geometryExport.kmz.successTitle')}
       errorTitle={t('geometryExport.kmz.errorTitle')}
       filenamePreview={filenamePreview}
-      exportDisabled={!selectedModel}
+      open={open}
+      exportDisabled={!selectedModel || missingGeoref}
       onExport={handleExport}
       onOpenStateChange={setOpenMirror}
     >
-      <>
+      {({ isExporting }) => <>
+        {missingGeoref && <ExportGeorefNotice modelId={selectedModel.id} disabled={isExporting} onClose={() => setOpenMirror(false)} />}
         {/* Google Earth Web does not support KML <Model>, so it cannot render a KMZ 3D
             model — only Earth Pro (desktop) can. Web users should export GLB instead. */}
         <Alert>
@@ -280,7 +287,7 @@ export function KmzExportDialog({ surface, trigger }: KmzExportDialogProps) {
             )}
           </div>
         </div>
-      </>
+      </>}
     </ExportDialogShell>
   );
 }

@@ -700,6 +700,100 @@ test('classifyDiff reports whether Cargo.lock changed (#4592)', () => {
   assert.equal(classifyDiff(parseNameStatus('M\trust/geometry/Cargo.toml')).cargoLockChanged, false);
 });
 
+test('classifyDiff: #10492 shape (Cargo.lock + generated retained notices) has no production file', () => {
+  const entries = parseNameStatus([
+    'M\tCargo.lock',
+    'M\tlicenses/retained/README.md',
+    'M\tlicenses/retained/THIRD_PARTY_NOTICES.txt',
+    'M\tlicenses/retained/manifest.json',
+    'M\tpackages/cli/THIRD_PARTY_NOTICES.txt',
+    'M\tpackages/wasm/THIRD_PARTY_NOTICES.txt',
+  ].join('\n'));
+  const { production, ignored } = classifyDiff(entries);
+  assert.deepEqual(production, []);
+  assert.equal(ignored.length, entries.length);
+});
+
+test('classifyPath: only the files `retained-notices.mjs --refresh` writes under licenses/retained/ are ignored', () => {
+  for (const generated of ['manifest.json', 'README.md', 'THIRD_PARTY_NOTICES.txt']) {
+    assert.equal(classifyPath(`licenses/retained/${generated}`), 'ignored', generated);
+  }
+  // Refresh also writes content-addressed texts/<sha256>.txt; the global .txt suffix already ignores them.
+  assert.equal(classifyPath(`licenses/retained/texts/${'0'.repeat(64)}.txt`), 'ignored');
+  // Hand-edited licence elections stay production.
+  assert.equal(classifyPath('licenses/retained/supplemental.json'), 'production');
+  assert.equal(classifyPath('licenses/retained/new-input.json'), 'production');
+});
+
+const pkg = (overrides = {}) => JSON.stringify({
+  name: '@ifc-lite/x',
+  version: '1.0.0',
+  scripts: { test: 'vitest run' },
+  dependencies: { three: '^0.170.0' },
+  devDependencies: { vitest: '^4.0.0' },
+  ...overrides,
+}, null, 2) + '\n';
+const classifyPackageJson = (before, after) => {
+  const { production } = classifyDiff(parseNameStatus('M\tpackages/x/package.json'), () => ({ before, after }));
+  return production.length ? 'production' : 'ignored';
+};
+
+test('classifyDiff: a package.json that changes only dependency version strings is ignored (#10562)', () => {
+  const after = pkg({ dependencies: { three: '^0.171.0' }, devDependencies: { vitest: '^4.1.0' } });
+  assert.equal(classifyPackageJson(pkg(), after), 'ignored');
+  assert.equal(classifyPackageJson(pkg({ optionalDependencies: { fsevents: '^2.3.2' } }), pkg({ optionalDependencies: { fsevents: '^2.3.3' } })), 'ignored');
+  for (const spec of ['~0.171.0', '>=0.170.0 <0.172.0', '0.171.0-beta.1', '1.0.0+build.5', '0.x', '^1 || ^2', '1.0.0 - 2.0.0', '=1.2.3', '1.2.x', '>=1.2.3 <2.0.0-0', '0.0.0']) {
+    assert.equal(classifyPackageJson(pkg(), pkg({ dependencies: { three: spec } })), 'ignored', spec);
+  }
+  const internal = { '@ifc-lite/data': 'workspace:*' };
+  assert.equal(
+    classifyPackageJson(pkg({ dependencies: { ...internal, three: '^0.170.0' } }), pkg({ dependencies: { ...internal, three: '^0.171.0' } })),
+    'ignored',
+    'an unchanged workspace: specifier next to the bump is fine',
+  );
+});
+
+test('classifyDiff: a dependency bump that also touches anything else in package.json stays production', () => {
+  const bumped = { dependencies: { three: '^0.171.0' } };
+  assert.equal(classifyPackageJson(pkg(), pkg({ ...bumped, scripts: { test: 'vitest run --bail' } })), 'production');
+  assert.equal(classifyPackageJson(pkg(), pkg({ ...bumped, main: 'dist/index.js' })), 'production');
+  assert.equal(classifyPackageJson(pkg(), pkg({ dependencies: { three: '^0.170.0', zod: '^3.0.0' } })), 'production');
+  assert.equal(classifyPackageJson(pkg(), pkg({ dependencies: {} })), 'production');
+  assert.equal(
+    classifyPackageJson(pkg({ peerDependencies: { react: '^18.0.0 || ^19.0.0' } }), pkg({ peerDependencies: { react: '^19.0.0' } })),
+    'production',
+    'a peer-range-only edit is a published contract change',
+  );
+  const peer = { peerDependencies: { react: '^18.0.0' } };
+  assert.equal(classifyPackageJson(pkg(peer), pkg({ ...peer, dependencies: { three: '^0.171.0' } })), 'ignored', 'unchanged peers beside a bump');
+  assert.equal(
+    classifyPackageJson(pkg(peer), pkg({ peerDependencies: { react: '^19.0.0' }, dependencies: { three: '^0.171.0' } })),
+    'production',
+    'a bump that also moves a peer range',
+  );
+  assert.equal(classifyPackageJson(pkg(), pkg({ dependencies: { three: { version: '1' } } })), 'production');
+  for (const source of ['npm:evil-three@1.0.0', 'github:someone/three#main', 'file:../three', 'someone/three', '..', '.', 'three.tgz', 'three.tar.gz', '\\\\host\\three', ' ..', 'three.tgz ', 'next', '*', 'next15', 'rc1', 'v8-canary', '1-beta', '', '-', '1.0.0 -', '- -', '1.x.3', '01.2.3', '>=1 - 2']) {
+    assert.equal(classifyPackageJson(pkg(), pkg({ dependencies: { three: source } })), 'production', source);
+  }
+  assert.equal(
+    classifyPackageJson(pkg({ dependencies: { three: 'workspace:*' } }), pkg({ dependencies: { three: '^1.0.0' } })),
+    'production',
+  );
+});
+
+test('classifyDiff: an unreadable or unparseable package.json side fails closed to production', () => {
+  const after = pkg({ dependencies: { three: '^0.171.0' } });
+  assert.equal(classifyPackageJson('{ "name": ', after), 'production');
+  assert.equal(classifyPackageJson(pkg(), after.slice(0, -10)), 'production');
+  assert.equal(classifyPackageJson('', after), 'production', 'gitShow returns "" for a side that does not exist');
+  assert.equal(classifyPackageJson(undefined, after), 'production');
+  assert.equal(classifyPackageJson('[]', '[]'), 'production');
+  const dupScripts = pkg().replace('"scripts"', '"scripts": { "test": "rm -rf /" },\n  "scripts"');
+  assert.equal(classifyPackageJson(pkg(), dupScripts), 'production', 'duplicate keys are rejected');
+  assert.equal(classifyPackageJson(pkg(), JSON.stringify(JSON.parse(after))), 'production', 'non-canonical formatting');
+  assert.equal(classifyDiff(parseNameStatus('M\tpackages/x/package.json')).production.length, 1, 'no reader: production');
+});
+
 test('#6663: parseNameStatus retains both rename locations through production classification', () => {
   const entries = parseNameStatus('R096\tpackages/a/src/old.ts\tpackages/a/src/new.ts');
   const expected = [{ status: 'R', path: 'packages/a/src/new.ts', oldPath: 'packages/a/src/old.ts' }];
@@ -1006,6 +1100,44 @@ test('a load error outranks green assertions elsewhere in the same run', () => {
   // whole tells us nothing.
   const mixed = `${VITEST_ASSERTION_FAILURE}\n${VITEST_LOAD_FAILURE}`;
   assert.equal(parseRunnerOutput({ family: 'vitest', stdout: mixed, stderr: '', exitCode: 1 }).kind, LOAD_FAILURE);
+});
+
+// The sandbox's esbuild-wasm probe logged this (pre-fix format) from inside a
+// test that then failed an ordinary assertion (#11256).
+const SANDBOX_NOISE = "[ifc-lite/sandbox] esbuild.wasm not resolvable as a bundled asset, falling back to the CDN TypeError [ERR_UNKNOWN_FILE_EXTENSION]: Unknown file extension \".wasm\"";
+
+test('#11256: load-error text logged beside an assertion failure stays an assertion failure', () => {
+  const node = NODE_ASSERTION_FAILURE.replace('# Subtest: adds', `# ${SANDBOX_NOISE}\n# Error [ERR_MODULE_NOT_FOUND]: Cannot find module 'x'\n# Subtest: adds`);
+  const r = parseRunnerOutput({ family: 'node-test', stdout: node, stderr: '', exitCode: 1 });
+  assert.equal(r.kind, ASSERTION_FAILURE);
+  assert.equal(r.failed, 1);
+
+  const vitest = `stderr | src/__probe/a.test.ts > p > fails\n${SANDBOX_NOISE}\n\n${VITEST_ASSERTION_FAILURE}`;
+  assert.equal(parseRunnerOutput({ family: 'vitest', stdout: vitest, stderr: '', exitCode: 1 }).kind, ASSERTION_FAILURE);
+  // Noise on stderr after the stdout summary sits past the banner: still the
+  // conservative reading, never a false assertion failure.
+  assert.equal(parseRunnerOutput({ family: 'vitest', stdout: VITEST_ASSERTION_FAILURE, stderr: SANDBOX_NOISE, exitCode: 1 }).kind, LOAD_FAILURE);
+});
+
+test("#11256: an assert diff's elided `...` line does not end the failing test's block early", () => {
+  const node = NODE_ASSERTION_FAILURE.replace(
+    '    1 !== 2\n',
+    '    1 !== 2\n    ...\n    TypeError: computeThing is not a function\n',
+  );
+  assert.equal(parseRunnerOutput({ family: 'node-test', stdout: node, stderr: '', exitCode: 1 }).kind, LOAD_FAILURE);
+});
+
+test('#11256: a failing test whose own error is a load error is still a load failure', () => {
+  const node = NODE_ASSERTION_FAILURE.replace(
+    "Expected values to be strictly equal:\n\n    1 !== 2\n",
+    "Cannot find module '/w/src/gone.ts' imported from /w/src/a.test.ts\n",
+  ).replace("code: 'ERR_ASSERTION'", "code: 'ERR_MODULE_NOT_FOUND'");
+  const r = parseRunnerOutput({ family: 'node-test', stdout: node, stderr: '', exitCode: 1 });
+  assert.equal(r.kind, LOAD_FAILURE);
+  assert.match(r.evidence[0], /Cannot find module|ERR_MODULE_NOT_FOUND/);
+  // A file that never imported is still caught even with noise elsewhere.
+  const file = `# ${SANDBOX_NOISE}\n${NODE_LOAD_FAILURE}`;
+  assert.equal(parseRunnerOutput({ family: 'node-test', stdout: file, stderr: '', exitCode: 1 }).kind, LOAD_FAILURE);
 });
 
 // ---------------------------------------------------------------------------

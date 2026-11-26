@@ -243,7 +243,7 @@ pub use extrusion::{extrude_profile, extrude_profile_lofted, extrude_profile_wit
 pub use instancing::{
     bake_source_at_world, collate_and_encode, collate_instances, collate_refs,
     collate_refs_in_basis, collate_refs_verified_in, compose_instance_world_row_major, decode_instance_finishes, decode_instanced,
-    encode_instanced, encode_refs, encode_refs_with_finishes, instance_rel_row_major_f32, verify_recomposition, Collated,
+    encode_instanced, encode_refs, encode_refs_with_finishes, instance_rel_row_major_f32, recomposes, verify_recomposition, Collated,
     DecodedInstance, DecodedInstanced, DecodedTemplate, InstanceMeshRef, InstanceOccurrence,
     InstanceTemplate, INSTANCED_MAGIC, INSTANCED_VERSION,
 };
@@ -287,7 +287,7 @@ pub use router::{
     aggregate_diagnostics, count_attributed_products, format_unsupported_breakdown,
     local_frame_set_enabled_override, meshed_representations, ClassificationStats, UNATTRIBUTED_PRODUCT_ID,
     GEOMETRY_DIAGNOSTICS_SCHEMA_VERSION, FACETED_BREP_DEDUP_FACE_LIMIT,
-    ClassificationSummary, GeometryDiagnostics, GeometryProcessor, GeometryRouter, HostBbox,
+    BudgetRefusal, ClassificationSummary, GeometryDiagnostics, GeometryProcessor, GeometryRouter, HostBbox,
     HostOpeningDiagnostic, ItemDedupCache, MappedInstancePlan, OpeningDiagnostic, OpeningKindDiag,
     ReasonCount, RectFastSummary, RectParam, RouterConfig, SharedMappedItemCache, AccountedMappedItemCache, SharedBrepSignatureCache, WorstHost,
 };

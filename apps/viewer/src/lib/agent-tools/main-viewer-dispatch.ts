@@ -3,25 +3,18 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * The tool surface the main viewer serves to a local agent (#9523).
- *
- * Only {@link MAIN_VIEWER_TOOL_ALLOWLIST} (reads) and
- * {@link MAIN_VIEWER_EDIT_TOOLS} (property and attribute edits, refused unless
- * the call's `canEdit` says the user allows them) are reachable. Every other
- * name is refused except for the viewer-native command tools: creating or
- * deleting entities, the inline viewer and headless model load/save are not
- * part of this surface. Palette commands can launch the native workflows
- * (including exports) after the user grants commands and edits. Each call is routed to exactly one model (see `resolveModel`), so a
- * federated session never mixes models in one answer.
- *
- * This module is meant to be imported lazily, by the bridge client that hands
- * calls to it; nothing on the viewer's eager path imports it.
+ * The main viewer serves a fixed tool allowlist, native palette commands and a
+ * schema-driven operation gateway. Reads, edits and declared native effects keep
+ * their live permissions and feature gates. Model-scoped tools resolve exactly
+ * one target; viewer/session operations declare that they require no model.
+ * This module is loaded by the local agent connection, off the eager viewer path.
  */
 
 import { ToolErrorCode, ToolExecutionError } from '@ifc-lite/mcp/browser';
 import { isAbortError } from '@/lib/runs/abort';
 import { LEGACY_MODEL_ID, LEGACY_MUTATION_MODEL_ID } from '@/sdk/adapters/model-compat';
 import { CATALOG } from '@/components/mcp/data';
+import type { DeliveryClaim } from './delivery.js';
 import { assertDispatchActive, cancelledDispatch } from './cancellation.js';
 import { viewerCommandTools, VIEWER_COMMAND_SPECS } from './viewer-command-tools.js';
 import { readTools } from './read-tools.js';
@@ -31,7 +24,7 @@ import { isFeatureEnabled } from '../features/index.js';
 import { costTools } from './cost-tools.js';
 import { mainViewerIdsTools } from './main-viewer-ids.js';
 import { EDIT_TOOL_NAMES, editNotAllowed, editTools, isEditTool } from './edit-tools.js';
-import type { AgentEdit, AgentTool, ModelHandle, ReadyModel, ToolHost, ToolNeeds } from './types.js';
+import type { AgentEdit, AgentTool, AgentToolImage, ModelHandle, ReadyModel, ToolCommitState, ToolHost, ToolNeeds, ToolOutput } from './types.js';
 
 /** Every tool the main viewer serves. Each must be a `read`-scope catalog tool (enforced by test). */
 export const MAIN_VIEWER_TOOL_ALLOWLIST = [
@@ -59,7 +52,6 @@ export function mainViewerTool(name: string): AgentTool | undefined {
   if (Object.hasOwn(viewerCommandTools, name)) return viewerCommandTools[name as keyof typeof viewerCommandTools];
   // bSDD is an outside service; a host can switch those off (`lib/features`).
   if (name in bsddTools && !isFeatureEnabled('privacy.third-party')) return undefined;
-  // Edits with `edit.model` off are refused at the write (`dataMutationPermission`, 'switched-off').
   if (isEditTool(name)) return editTools[name];
   return (MAIN_VIEWER_TOOL_ALLOWLIST as readonly string[]).includes(name) ? SHARED_TOOLS[name] : undefined;
 }
@@ -73,6 +65,8 @@ export interface AgentToolResult {
   hint?: string;
   /** What an edit tool changed. Tab-side only: the result frame carries `structured`, not this. */
   edit?: AgentEdit;
+  /** An image for the agent; the result frame carries it only when the bridge supports images. */
+  image?: AgentToolImage;
 }
 
 const LEGACY_ALIASES = new Set(['legacy', LEGACY_MUTATION_MODEL_ID]);
@@ -142,7 +136,7 @@ function hasStore(model: ModelHandle): model is ReadyModel {
 }
 
 /** The model as a tool may read it, or a specific refusal saying why it cannot. */
-function usableModel(model: ModelHandle, needs: Exclude<ToolNeeds, 'none'>, tool: string): ReadyModel {
+export function usableModel(model: ModelHandle, needs: Exclude<ToolNeeds, 'none'>, tool: string): ReadyModel {
   const usable = needs === 'store' ? STORE_IS_ENOUGH.has(model.status) : model.status === 'ready';
   if (usable && hasStore(model)) return model;
   const status = model.status === 'ready' ? 'no-data' : model.status;
@@ -193,24 +187,31 @@ function assertModelCurrent(host: ToolHost, model: ReadyModel): void {
 }
 
 /** Settle as cancelled the moment `signal` aborts, instead of waiting on a lookup that cannot be interrupted. */
-function untilAborted<T>(work: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+function untilAborted<T>(work: Promise<T>, signal: AbortSignal | undefined, committed: () => boolean = () => false): Promise<T> {
   if (!signal) return work;
   return new Promise<T>((resolve, reject) => {
-    const abort = () => reject(cancelledDispatch());
-    if (signal.aborted) { abort(); return; }
-    signal.addEventListener('abort', abort, { once: true });
+    const abort = () => { if (!committed()) reject(cancelledDispatch()); };
+    if (signal.aborted) abort();
+    if (!signal.aborted) signal.addEventListener('abort', abort, { once: true });
     work.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort));
   });
 }
 
 export interface DispatchContext {
   signal?: AbortSignal;
+  /** A transport can take ownership of a successful result until it confirms delivery. */
+  onDelivery?: (claim: DeliveryClaim) => void;
   /**
    * Whether the user allows the agent to edit right now. Edit tools are
    * refused with READ_ONLY unless it returns true, checked before the call
    * starts and again at the write. Absent means read-only.
    */
   canEdit?: () => boolean;
+}
+
+/** A tool's success as an outcome: every success path carries the edit and image a tool returned. */
+function succeeded(out: ToolOutput): AgentToolResult {
+  return { text: out.text, structured: out.structured, isError: false, ...(out.edit ? { edit: out.edit } : {}), ...(out.image ? { image: out.image } : {}) };
 }
 
 /**
@@ -225,28 +226,50 @@ export async function dispatchMainViewerTool(
 ): Promise<AgentToolResult> {
   const tool = mainViewerTool(toolName);
   if (!tool) return refusal(toolName);
+  let claim: DeliveryClaim | undefined;
+  let dropped = false;
+  let commitState: ToolCommitState = { committed: false };
+  const claimDelivery = (next: DeliveryClaim, sharedCommitState?: ToolCommitState) => {
+    if (dropped) next.drop();
+    else {
+      claim = next;
+      if (sharedCommitState) commitState = sharedCommitState;
+    }
+  };
   try {
     // Read-only is enforced here, not only by the bridge: it trusts the labels this tab sent.
-    if (isEditTool(toolName) && !ctx.canEdit?.()) throw editNotAllowed();
+    if (isEditTool(toolName)) {
+      if (!isFeatureEnabled('edit.model')) {
+        throw new ToolExecutionError({ code: ToolErrorCode.READ_ONLY, message: 'Model editing is disabled by the viewer host.' });
+      }
+      if (!ctx.canEdit?.()) throw editNotAllowed();
+    }
     if (args != null && (typeof args !== 'object' || Array.isArray(args))) {
       throw new ToolExecutionError({ code: ToolErrorCode.INVALID_INPUT, message: 'Tool arguments must be a JSON object.' });
     }
     const input = (args ?? {}) as Record<string, unknown>;
     assertDispatchActive(ctx.signal);
     if (tool.needs === 'none') {
-      const out = await untilAborted(tool.run(host, input, ctx), ctx.signal);
-      return { text: out.text, structured: out.structured, isError: false };
+      const out = await untilAborted(tool.run(host, input, { signal: ctx.signal, canEdit: ctx.canEdit, commitState, claimDelivery }), ctx.signal, () => commitState.committed || commitState.committing === true);
+      if (claim) {
+        if (!commitState.committed) assertDispatchActive(ctx.signal);
+        if (ctx.onDelivery) ctx.onDelivery(claim);
+        else claim.deliver();
+      }
+      return succeeded(out);
     }
     const model = usableModel(resolveModel(host, input), tool.needs, toolName);
     const stillCurrent = () => assertModelCurrent(host, model);
     const out = await untilAborted(
-      tool.run(host, model, input, { signal: ctx.signal, checkpoint: stillCurrent, canEdit: ctx.canEdit }), ctx.signal);
+      tool.run(host, model, input, { signal: ctx.signal, checkpoint: stillCurrent, canEdit: ctx.canEdit, commitState }), ctx.signal, () => commitState.committed || commitState.committing === true);
     // An edit is written synchronously and is in the undo history: report it as done.
-    if (out.edit) return { text: out.text, structured: out.structured, isError: false, edit: out.edit };
+    if (commitState.committed || out.edit) return succeeded(out);
     // The work read whatever the store held; answer only if that is still this model.
     stillCurrent();
-    return { text: out.text, structured: out.structured, isError: false };
+    return succeeded(out);
   } catch (caught) {
+    dropped = true;
+    claim?.drop();
     const err = isAbortError(caught) ? cancelledDispatch() : caught;
     if (err instanceof ToolExecutionError) {
       return { text: err.message, structured: err.details ?? null, isError: true, errorCode: err.code, hint: err.hint };

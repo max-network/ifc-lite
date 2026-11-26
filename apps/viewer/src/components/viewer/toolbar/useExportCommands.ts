@@ -22,8 +22,8 @@ import { useExtensionExporters } from '@/components/extensions/useExtensionExpor
 import { useViewerStore } from '@/store';
 import { listIonExportModels } from '../export-model-selection';
 import { buildCommandPaletteJsonEntities } from '../commandPaletteJsonExport';
+import { MESH_DERIVED_EXPORTS, EXACT_ONLY_EXPORTS } from '@/lib/export/native-policy';
 import { exportCsvFromBytes } from '@/lib/export/csv';
-import { editedModelBytes } from '@/lib/export/edited-model-bytes';
 import { activeModelName, downloadFile, downloadDataUrl, modelExportFilename } from '@/lib/export/download';
 import { toast } from '@/components/ui/toast';
 import { recordActivity } from '@/lib/activity/activity-journal';
@@ -47,14 +47,12 @@ export interface ResolvedExportCommand {
 }
 
 /** 3D exports built from the loaded meshes: refused on a retained, shape-only model (#7955 M2). */
-const MESH_DERIVED_EXPORTS: ReadonlySet<string> = new Set(['glb', 'kmz', 'ion', 'usd', '3dm']);
 
 /**
  * Exports that re-mesh the FILE with the exact engine (USD, Rhino .3dm, the energy models, and Cesium ion, which uploads the
  * model's STEP for Cesium to re-mesh): for a retained model that is a different geometry from the one on screen,
  * so they are refused while any loaded model is retained, complete or not (#7955).
  */
-const EXACT_ONLY_EXPORTS: ReadonlySet<string> = new Set(['usd', '3dm', 'energy', 'ion']);
 
 /** `spatial` is the one table whose type id does not say what the file holds. */
 const CSV_SUFFIX: Record<CsvExportType, string> = {
@@ -123,6 +121,7 @@ export function useExportCommands(surface: ExportSurface) {
       await recordActivity({ kind: 'export', title: CSV_ACTIVITY_TITLE[type],
         subject: `${sourceName}${activeModelOnlyNote}` }, async () => {
         // The model as edited, not the file as loaded (#5397).
+        const { editedModelBytes } = await import('@/lib/export/edited-model-bytes');
         const bytes = editedModelBytes(sourceStore, mutationView);
         const csv = await exportCsvFromBytes(bytes, type, { includeProperties: type === 'entities' });
         downloadFile(csv, filename, 'text/csv');

@@ -62,7 +62,7 @@ import { applySourceLineMutationsReported } from './step-attribute-mutations.js'
 import type { IfcSchemaVersion } from './schema-converter.js';
 import { convertStepLineFlattening } from './schema-style-flatten.js';
 import { nominateDeliveredInPlaceEdits } from './in-place-nomination.js';
-import { decodeRange } from './source-ref-bounds.js';
+import { decodeTypedPropertyRecord } from './schema-converter-typed-properties.js';
 import type { PropertySetContext } from './step-property-set-readers.js';
 import { retainSharedAtoms } from './step-shared-atom-retention.js';
 import { detachRelatedObjects } from './step-pset-copy-on-write.js';
@@ -139,8 +139,8 @@ export function writeSourceEntityLines(
   // Export original entities from source buffer, SKIPPING modified property sets
   if (!options.deltaOnly && ctx.dataStore.source) {
     const source = ctx.dataStore.source;
-    // A converted IFC2X3 varying action needs a new load configuration record.
-    if (pass.converting) pass.enums.structural.varying.ids = ctx.propertySetContext().allocateExpressId;
+    // Structural conversion adds records: load configurations, 'Causes' relationships, property sets.
+    if (pass.converting) pass.enums.structural.ids = ctx.propertySetContext().allocateExpressId;
 
     // Extract existing entities from source. The effective index has already
     // dropped everything the overlay tombstoned, so there is no separate
@@ -184,15 +184,7 @@ export function writeSourceEntityLines(
         continue;
       }
 
-      // Get original entity text — decodeRange handles SAB-backed
-      // sources (Firefox/Chrome reject `TextDecoder.decode()` on a
-      // SharedArrayBuffer-backed view; the parser deliberately keeps
-      // `source` zero-copy SAB-backed for worker sharing).
-      const entityText = decodeRange(
-        source,
-        entityRef.byteOffset,
-        entityRef.byteOffset + entityRef.byteLength
-      );
+      const entityText = decodeTypedPropertyRecord(source, entityRef, pass.sourceSchema, pass.schema);
       // Retype, named attribute edits and positional edits, in that order.
       // Shared verbatim with the type-object `HasPropertySets` rewrite in
       // `step-property-sets.ts`, which writes the line this pass would
@@ -347,7 +339,8 @@ export function writeSourceEntityLines(
         pass.entities.push(nextEntityText);
       }
     }
-    pass.entities.push(...pass.enums.structural.varying.added());
+    // IFC2X3 requires an OwnerHistory on the rooted records added there.
+    pass.entities.push(...pass.enums.structural.added().map((line) => (pass.schema === 'IFC2X3' ? pass.slotFill.apply(line) : line)));
   }
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "@ifc-lite/site-context",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Site context as data for Swiss projects: swissALTI3D terrain, the cadastral parcel and neighbouring swissBUILDINGS3D buildings around a georeferenced model, in one EPSG:2056 frame, as a self-describing GLB",
   "type": "module",
   "sideEffects": false,
@@ -26,9 +26,9 @@
     "@ifc-lite/tiles3d": "workspace:^"
   },
   "devDependencies": {
-    "@mergifyio/vitest": "^2026.10.11",
+    "@mergifyio/vitest": "^2026.11.8",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   },
   "license": "MPL-2.0",
   "author": "Louis True",

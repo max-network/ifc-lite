@@ -138,7 +138,7 @@ describe('convertStepLine refuses an unrepresentable non-rooted entity rather th
 
     it('a rooted referrer (IfcRelAssociatesMaterial) naming a withheld set id is redirected to a proxy, not left dangling', () => {
       const rel =
-        "#345=IFCRELASSOCIATESMATERIAL('guid',#45,$,$,(#228,#263,#296),#344);";
+        "#345=IFCRELASSOCIATESMATERIAL('guid',#45,$,$,(#228,#263,#296),\n  #344);";
       const withheld = new Set([344]);
       const out = convertStepLine(rel, 'IFC4', 'IFC2X3', undefined, undefined, withheld);
       expect(out).toContain('IFCPROXY');
@@ -164,7 +164,7 @@ describe('convertStepLine refuses an unrepresentable non-rooted entity rather th
 
 describe('a record headed by a data-type name fails closed on an IFC2X3 target (#7683, D3)', () => {
   it('throws like the Rust twin instead of passing the malformed record through', () => {
-    // Only entities head STEP records. Rust's `has_representation` reads core's
+    // Only entities head STEP records. Rust's `missing_type_route` reads core's
     // IFC2X3 entity registry, which has no IFCLABEL, and refuses the export.
     // This side used to need the SOURCE table to know the type first, and
     // IFC4's has no IFCLABEL either, so it passed the record through.
