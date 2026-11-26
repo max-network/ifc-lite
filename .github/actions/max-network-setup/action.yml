@@ -1,5 +1,5 @@
 name: Set up the max-network workspace
-description: Node 22, pnpm through corepack, the locked install and the prebuilt wasm.
+description: Node 22, pnpm through corepack, the locked install and the wasm runtime (prebuilt when it matches, built from source otherwise).
 
 runs:
   using: composite
@@ -17,5 +17,24 @@ runs:
       run: pnpm install --frozen-lockfile
 
     - name: Fetch the prebuilt wasm
+      id: fetch-wasm
       shell: bash
-      run: pnpm build:wasm:fetch
+      run: |
+        if pnpm build:wasm:fetch; then
+          echo "built=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "::notice::The published wasm is behind the committed bindings; building it from source."
+          echo "built=true" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Set up the wasm toolchain
+      if: steps.fetch-wasm.outputs.built == 'true'
+      uses: ./.github/actions/setup-wasm-build
+      with:
+        cache-prefix: max-network
+        save-if: ${{ github.ref == 'refs/heads/max-network/main' }}
+
+    - name: Build the wasm from source
+      if: steps.fetch-wasm.outputs.built == 'true'
+      shell: bash
+      run: pnpm build:wasm
