@@ -45,8 +45,9 @@ describe('retireProductShape', () => {
     const { store, editor, first, second, shapeOf, exported } = await wallSession();
     const count = (step: string, type: string) => step.match(new RegExp(`=${type}\\(`, 'g'))?.length ?? 0;
     const before = exported();
+    const shape = shapeOf(first)!;
     editor.removeEntity(first);
-    retireProductShape(store, editor, shapeOf(first)!);
+    retireProductShape(store, editor, shape);
     const after = exported();
     for (const type of ['IFCEXTRUDEDAREASOLID', 'IFCRECTANGLEPROFILEDEF']) expect(count(after, type)).toBe(count(before, type) - 1);
     expect(count(after, 'IFCAXIS2PLACEMENT2D')).toBeLessThan(count(before, 'IFCAXIS2PLACEMENT2D'));
