@@ -167,6 +167,8 @@ export type {
 
 export { HatchGenerator } from './hatch-generator.js';
 export type { HatchLine, HatchResult, CustomHatchSettings } from './hatch-generator.js';
+export { insulationZigzag, layerBand, INSULATION_LEG_PITCH } from './insulation-hatch.js';
+export type { LayerBand } from './insulation-hatch.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SVG EXPORT

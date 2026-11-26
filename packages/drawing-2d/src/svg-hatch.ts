@@ -36,10 +36,6 @@ const PATTERN_DEFS: Partial<Record<HatchPatternType, PatternBody>> = {
   }),
   steel: (s) => ({ size: s * 0.7, transform: 'rotate(45)', body: `<line x1="0" y1="0" x2="0" y2="${s * 0.7}" ${stroke(0.2, '#333')}/>` }),
   brick: (s) => ({ size: s * 0.5, transform: 'rotate(45)', body: `<line x1="0" y1="0" x2="0" y2="${s * 0.5}" ${stroke(0.15)}/>` }),
-  insulation: (s) => ({
-    size: s,
-    body: `<polyline points="0,${s / 2} ${s / 4},0 ${(3 * s) / 4},${s} ${s},${s / 2}" fill="none" ${stroke(0.1)}/>`,
-  }),
   wood: (s) => ({ size: s * 0.7, transform: 'rotate(135)', body: `<line x1="0" y1="0" x2="0" y2="${s * 0.7}" ${stroke(0.1)}/>` }),
   earth: (s) => ({
     size: s,

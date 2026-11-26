@@ -13,6 +13,7 @@ import type { Point2D, Line2D, Polygon2D, DrawingPolygon, Bounds2D } from './typ
 import type { HatchPattern, HatchPatternType } from './styles.js';
 import { getHatchPattern } from './styles.js';
 import { EPSILON } from './math.js';
+import { insulationZigzag } from './insulation-hatch.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -75,6 +76,13 @@ export class HatchGenerator {
 
     if (pattern.type === 'none' || pattern.type === 'solid' || pattern.type === 'glass') {
       return { lines: [], pattern, polygon };
+    }
+
+    if (pattern.type === 'insulation') {
+      const lines = insulationZigzag(polygon.polygon.outer).flatMap((leg) =>
+        this.clipLineToPolygon(leg, polygon.polygon).map((line) => ({ line, entityId: polygon.entityId, ifcType: polygon.ifcType, modelIndex: polygon.modelIndex })),
+      );
+      return { lines, pattern, polygon };
     }
 
     // Adjust spacing for drawing scale
