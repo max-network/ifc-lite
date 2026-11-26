@@ -38,15 +38,17 @@ import { parsePython, PYTEST_MISSING_PATTERN } from './revert-oracle-python.mjs'
 import { ALL_SKIPPED, classifyExecuted, severityCandidates } from './revert-oracle-all-skipped.mjs';
 import { passVerdict } from './revert-oracle-pass-verdict.mjs';
 import { processResultGap } from './revert-oracle-process-result.mjs';
+import { loadErrorScope } from './revert-oracle-load-error-scope.mjs';
 import { isInertPath, isTestSupportPath } from './revert-oracle-inert.mjs';
+import { isDependencyVersionOnlyPackageJson } from './revert-oracle-version-bump.mjs';
 export { cargoRunner } from './revert-oracle-cargo.mjs';
 // ---------------------------------------------------------------------------
 // Diff classification
 // ---------------------------------------------------------------------------
 
-/** Paths no test can observe: release/CI/docs. `tests/e2e/**` is test scaffolding; its Playwright specs run in a browser (#6267). */
+/** Paths no test can observe: release/CI/docs, and the files `retained-notices.mjs --refresh` writes (gated by its `--check`; hand-edited `supplemental.json` stays production). `tests/e2e/**` is test scaffolding; its Playwright specs run in a browser (#6267). */
 const IGNORED_PREFIXES = ['.changeset/', '.github/', 'docs/', '.vscode/'];
-const IGNORED_EXACT = new Set(['pnpm-lock.yaml', 'package-lock.json', 'yarn.lock', 'Cargo.lock', 'rust/python/Cargo.lock', 'CHANGELOG.md', 'playwright.config.ts']);
+const IGNORED_EXACT = new Set(['licenses/retained/manifest.json', 'licenses/retained/README.md', 'licenses/retained/THIRD_PARTY_NOTICES.txt', 'pnpm-lock.yaml', 'package-lock.json', 'yarn.lock', 'Cargo.lock', 'rust/python/Cargo.lock', 'CHANGELOG.md', 'playwright.config.ts']);
 const IGNORED_SUFFIXES = ['.md', '.mdx', '.txt', '.snap.orig'];
 
 /**
@@ -87,15 +89,13 @@ export function classifyPath(path) {
 
 /**
  * @param {Array<{status: string, path: string, oldPath?: string}>} entries from `git diff --name-status`
+ * @param {(path: string) => {before?: string, after?: string}} [readSides] merge-base/head text; without it, or when either side does not parse, a dependency-version-only package.json stays production
  */
-export function classifyDiff(entries) {
-  const production = [];
-  const test = [];
-  const ignored = [];
-  const inert = [];
-  const warnings = [];
+export function classifyDiff(entries, readSides) {
+  const [production, test, ignored, inert, warnings] = [[], [], [], [], []];
   for (const entry of entries) {
-    const kind = classifyPath(entry.path);
+    let kind = classifyPath(entry.path);
+    if (kind === 'production' && readSides && isDependencyVersionOnlyPackageJson(entry.path, readSides)) kind = 'ignored';
     const bucket = kind === 'production' ? production : kind === 'test' ? test : kind === 'inert' ? inert : ignored;
     bucket.push(entry);
   }
@@ -294,8 +294,8 @@ export function parseRunnerOutput(run) {
   if (earlyProcessGap && (run.signal || run.exitCode === null)) return earlyProcessGap;
 
   // Load/collection evidence outranks assertion output; green processes may
-  // contain error-shaped fixture text without becoming failures (#4109).
-  const textualHit = run.exitCode === 0 && parsed.total > 0 ? null : firstMatch(text, LOAD_ERROR_PATTERNS);
+  // contain error-shaped fixture text without becoming failures (#4109, #11256).
+  const textualHit = run.exitCode === 0 && parsed.total > 0 ? null : firstMatch(loadErrorScope(family, text, parsed), LOAD_ERROR_PATTERNS);
   for (const hit of [textualHit, parsed.loadEvidence]) if (hit) evidence.push(hit);
   if (evidence.length > 0) {
     return { kind: LOAD_FAILURE, passed: parsed.passed, failed: parsed.failed, total: parsed.total, evidence };

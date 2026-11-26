@@ -28,6 +28,7 @@ import { toast } from '../components/ui/toast.js';
 import { acquireFederationLoadSlot, releaseFederationLoadSlot } from './federationLoadGate.js';
 import { createModelLoadActivity, installModelLoadCanceller, LOAD_COMPLETE, settleOwnedLoadUi, watchLoadSupersession } from './modelLoadCanceller.js';
 import { realignFederatedPointClouds } from './ingest/pointCloudFederationLifecycle.js';
+import { removeFederatedModel } from './ingest/federationRemove.js';
 import { showLoadError } from '@/lib/analytics';
 
 /**
@@ -50,7 +51,6 @@ export function useIfcFederation(
     setProgress,
     setGeometryResult,
     // Multi-model state and actions
-    removeModel: storeRemoveModel,
     clearAllModels,
     getModel,
     // Federation Registry helpers
@@ -62,7 +62,6 @@ export function useIfcFederation(
     setError: s.setError,
     setProgress: s.setProgress,
     setGeometryResult: s.setGeometryResult,
-    removeModel: s.removeModel,
     clearAllModels: s.clearAllModels,
     getModel: s.getModel,
     fromGlobalId: s.fromGlobalId,
@@ -154,7 +153,7 @@ export function useIfcFederation(
         collapsed: options?.collapsed,
         loadedAt,
         sharedRtcOffset,
-      }, { sourceHandle: options?.sourceHandle, retryOperation: options?.retryOperation, workflowOwner: options?.workflowOwner, gaussianPlacement: options?.gaussianPlacement, gaussianUpAxis: options?.gaussianUpAxis, gaussianAttribution: options?.gaussianAttribution, gaussianReplacingModelId: options?.gaussianReplacingModelId, onGaussianBudgetReserved: options?.onGaussianBudgetReserved, onGaussianLoadSettled: options?.onGaussianLoadSettled, onLoadError: options?.onError, onModelRegistered: () => { thisAdd.registered = true; } });
+      }, { siteContextArrival: options?.siteContextArrival, sourceHandle: options?.sourceHandle, retryOperation: options?.retryOperation, workflowOwner: options?.workflowOwner, gaussianPlacement: options?.gaussianPlacement, gaussianUpAxis: options?.gaussianUpAxis, gaussianAttribution: options?.gaussianAttribution, gaussianReplacingModelId: options?.gaussianReplacingModelId, onGaussianBudgetReserved: options?.onGaussianBudgetReserved, onGaussianLoadSettled: options?.onGaussianLoadSettled, onLoadError: options?.onError, onModelRegistered: () => { thisAdd.registered = true; } });
 
       // Registration is the outcome, also when a newer add overlapped this one:
       // a superseded load still settled a model (#4897, `federationRtcRebase.ts`).
@@ -300,13 +299,7 @@ export function useIfcFederation(
   /**
    * Remove a model from the federation
    */
-  const removeModel = useCallback((modelId: string) => {
-    // The store selects the successor and updates both active-data mirrors
-    // atomically. Re-copying the first survivor here overwrites a different
-    // active model's source and geometry under its existing ID range (#7890).
-    storeRemoveModel(modelId);
-    realignFederatedPointClouds(findReferenceSpatialModel()?.placement ?? null);
-  }, [storeRemoveModel]);
+  const removeModel = useCallback((modelId: string) => removeFederatedModel(modelId), []);
 
   /**
    * Get query instance for a specific model
@@ -414,7 +407,7 @@ export function useIfcFederation(
     }
   }, [setLoading, setProgress, setGeometryResult, clearAllModels]);
 
-  const loadFederatedIfcx = useCallback(async (files: File[]): Promise<void> => {
+  const loadFederatedIfcx = useCallback(async (files: File[], beforePrimaryReset?: () => void): Promise<void> => {
     if (files.length === 0) {
       reportError('No files provided for federated loading', 'ifcx_federated_no_files', null); // no retry: empty list
       return;
@@ -424,8 +417,7 @@ export function useIfcFederation(
     // IFCX is JSON; SAB streaming would force a SAB→scratch copy in
     // safeUtf8Decode on top of the JSON string (net worse peak than
     // ArrayBuffer). Keep on file.arrayBuffer(). The copy is no longer
-    // *retained* since #2183 capped the scratch, but it is still a
-    // full-file transient the ArrayBuffer path does not pay.
+    // *retained* since #2183, but the ArrayBuffer path avoids it.
     const buffers: Array<{ buffer: ArrayBuffer; name: string }> = [];
     for (const file of files) {
       const buffer = await file.arrayBuffer();
@@ -437,6 +429,7 @@ export function useIfcFederation(
       buffers.push({ buffer, name: file.name });
     }
 
+    beforePrimaryReset?.();
     await loadFederatedIfcxFromBuffers(buffers);
   }, [loadFederatedIfcxFromBuffers]);
 

@@ -3,6 +3,10 @@
     "value": "{ms} ms",
     "reason": "Runtime placeholder with a unit symbol (milliseconds); no English prose."
   },
+  "agentBridge.panel.repeated": {
+    "value": "×{count}",
+    "reason": "Runtime count with a multiplication sign; no English prose."
+  },
   "align.mode.centre": {
     "value": "Centre",
     "reason": "French uses the same spelling « Centre » for this contextual label; reviewed against its feature meaning."
@@ -2210,5 +2214,37 @@
   "viewportLighting.container.emptyState.formats.rhino": {
     "value": "Rhino",
     "reason": "Format family name on the welcome card: Rhino is the product name of the authoring tool behind .3dm and is not localized in any language."
+  },
+  "siteContext.category.terrain": {
+    "value": "Terrain",
+    "reason": "French uses the same spelling « Terrain » for this contextual label; reviewed against its feature meaning."
+  },
+  "siteContext.section.radiusValue": {
+    "value": "{radius} m",
+    "reason": "Runtime placeholders with mathematical notation, axis letters, version prefix or unit symbols; no English prose."
+  },
+  "exportCommands.cityjson.label": {
+    "value": "CityJSON",
+    "reason": "Canonical interoperable file format name and extension."
+  },
+  "cityJsonExport.document": {
+    "value": "CityJSON (.city.json)",
+    "reason": "Canonical interoperable file format name and extension."
+  },
+  "cityJsonExport.sequence": {
+    "value": "CityJSONSeq (.city.jsonl)",
+    "reason": "Canonical interoperable file format name and extension."
+  },
+  "a2ui.noValue": {
+    "value": "—",
+    "reason": "Placeholder dash for an empty cell in an A2UI table or card; a symbol, not English prose."
+  },
+  "a2ui.table.group": {
+    "value": "{group} ({count})",
+    "reason": "Group header made only of runtime placeholders (the group value and its row count); no English prose."
+  },
+  "a2ui.card.classifications": {
+    "value": "Classifications",
+    "reason": "The French word for classification systems is spelled the same as the English one."
   }
 }

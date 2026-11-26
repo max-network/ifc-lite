@@ -25,6 +25,12 @@ Each drawing includes:
 | **Architectural symbols** | Door swings, window frames, stair arrows |
 | **Annotations** | Dimensions and labels |
 
+IFC export includes the active model's Distance measurements, linear dimensions
+and entity-bound tags as `IfcAnnotation` curves and text. Tags retain a relationship
+to their element. Reopening the IFC restores these editable markups; an unchanged
+re-export preserves their STEP records. This applies to IFC2X3, IFC4 and IFC4X3.
+IFC export refuses a project length-unit change while annotations outside the current drawing would be retained; keep the original project units to preserve those frames without altering their geometry.
+
 ## Element tags in the viewer
 
 In a plan or section drawing, choose **Tag** and click a door, window or space.
@@ -370,6 +376,36 @@ if (isGPUComputeAvailable()) {
   const result = await cutter.cutMeshes(meshData, sectionConfig);
 }
 ```
+
+### Streamed Geometry
+
+`Drawing2DGenerator.generateFromSource(source, config, options)` draws from a
+`DrawingMeshSource` instead of one mesh array. The source yields batches in at
+most two passes, `'geometry'` (section cut and projection) and, only when
+needed, `'occlusion'` (hidden-line depth raster and the free-edge test of
+open surfaces). The generator keeps only 2D output, one depth raster and
+per-entity edge parity between batches, so its working input is one batch,
+not the model. Every pass must yield the same meshes in the same order; the
+drawing then equals `generate` over those meshes. A source error or an
+aborted `options.signal` rejects the drawing.
+
+Callers that push leased chunks instead use `generator.beginDrawing(config,
+options)`, which returns a `DrawingSession`: call `addGeometry(batch)` for each
+chunk, then `endGeometry()`. Its result says whether the hidden-line raster
+needs every chunk again (`depthRaster`), or only the meshes of
+`openSurfaceEntities`. Feed those to `addOcclusion(batch)`, then call
+`finish()` (or `cancel()`). No batch is kept, so each lease can be released
+before the next one is taken. Joins across chunks, occlusion and projection
+stay the same, because `generate` drives this same session.
+
+The viewer uses it for the Drawing panel and the 3D section overlay. Resident
+models are cut as before. A model whose CPU arrays were released (today only
+by the test-only release, #10264) is read back from its local backing one
+chunk at a time, and its instanced occurrences are expanded from the backed
+shards in bounded groups. A backing that is missing, incomplete or replaced
+while it is read fails the drawing instead of drawing partial geometry.
+GPU-instanced occurrences are cut like flat geometry in both cases; before,
+the drawing left them out.
 
 ## Viewer Integration
 

@@ -43,6 +43,7 @@
  * not a behaviour any test relied on (a failure was, and still is, toasted).
  */
 
+import { useViewPdfSource } from './useViewPdfSource';
 import type { ExportSurface } from '@/lib/analytics-export-events';
 import { useCallback, useMemo, useState } from 'react';
 import { FileText } from 'lucide-react';
@@ -59,10 +60,11 @@ import {
 import { useViewerStore } from '@/store';
 import { useTranslation } from '@/i18n';
 import { trackExportCompleted } from '@/lib/analytics';
+import { downloadBlob } from '@/lib/export/download';
 import { toast } from '@/components/ui/toast';
 import { formatScaleFactorLabel, formatSheetScaleLabel } from '@ifc-lite/drawing-2d';
 import { collectViewMeshes } from '@/lib/export/view-pdf/collect-view-meshes';
-import { readViewPdfSource, readViewZoom } from '@/lib/export/view-pdf/view-pdf-export-source';
+import { readViewZoom } from '@/lib/export/view-pdf/view-pdf-export-source';
 import { resolveKeptHalfSpace } from '@/lib/export/view-pdf/view-section-plane';
 import {
   estimateViewPdfLayout,
@@ -70,6 +72,7 @@ import {
 } from '@/lib/export/view-pdf/view-pdf-page-estimate';
 import {
   deriveDisplayedScaleFactor,
+  formatMm,
   describePage,
 } from '@/lib/export/view-pdf/view-pdf-scale';
 import { viewPdfPhaseLabel } from '@/lib/export/view-pdf/view-pdf-progress';
@@ -103,11 +106,6 @@ interface PdfViewExportDialogProps {
 /** The drafting scales offered as presets, coarsest detail last. */
 const SCALE_PRESETS = [10, 20, 50, 100, 200, 500] as const;
 
-/** Round a millimetre figure for display without inventing precision. */
-function formatMm(value: number): string {
-  const rounded = Math.round(value * 10) / 10;
-  return Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1);
-}
 
 export function PdfViewExportDialog({ surface, trigger, exportViewPdf }: PdfViewExportDialogProps) {
   const { t } = useTranslation();
@@ -151,12 +149,9 @@ export function PdfViewExportDialog({ surface, trigger, exportViewPdf }: PdfView
     if (next) setPhase(null);
   }, []);
 
-  const source = useMemo(
-    () => (open ? readViewPdfSource(useViewerStore.getState()) : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- these are invalidation triggers; the values are read from getState() above.
-    [open, models, geometryResult, hiddenEntities, isolatedEntities, typeVisibility, structuralViewMode,
-      sectionPlane, selectedStoreys, classFilter, projectionMode, mutationVersion, mutationViews],
-  );
+  // Released CPU geometry (#10264) is read back first; resident geometry reads synchronously.
+  const { source, status: sourceStatus } = useViewPdfSource(open, [models, geometryResult, hiddenEntities, isolatedEntities, typeVisibility, structuralViewMode,
+    sectionPlane, selectedStoreys, classFilter, projectionMode, mutationVersion, mutationViews]);
 
   const camera = source?.camera ?? null;
   const drawnMeshes = useMemo(() => (source ? collectViewMeshes(source.view) : []), [source]);
@@ -239,8 +234,10 @@ export function PdfViewExportDialog({ surface, trigger, exportViewPdf }: PdfView
       // load lands in the catch below, not on the console as an unhandled
       // rejection.
       const runExport = exportViewPdf ?? (async (pdfInput: ViewPdfExportInput) => {
-        const { generateViewPdf } = await import('@/lib/export/view-pdf/generate-view-pdf');
-        return generateViewPdf(pdfInput);
+        const { produceNativeViewPdf } = await import('@/lib/export/native-view-pdf');
+        const { result, blob } = await produceNativeViewPdf(pdfInput);
+        downloadBlob(blob, result.filename);
+        return result;
       });
       const result = await runExport({
         view: source.view,
@@ -370,7 +367,7 @@ export function PdfViewExportDialog({ surface, trigger, exportViewPdf }: PdfView
 
       <PdfViewPageNotices
         preview={preview}
-        oversize={oversize}
+        oversize={oversize} sourceStatus={sourceStatus}
         projectionMode={camera?.projectionMode ?? null}
         onSwitchToOrthographic={() => setProjectionMode('orthographic')}
         formatMm={formatMm}

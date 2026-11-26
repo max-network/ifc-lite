@@ -68,7 +68,7 @@ describe('insulation hatch', () => {
       stats: { cutLineCount: 0, projectionLineCount: 0, hiddenLineCount: 0, silhouetteLineCount: 0, polygonCount: 1, totalTriangles: 0, processingTimeMs: 0 },
     };
     const svg = exportToSVG(drawing, { materialCategories: new Map([[7, 'insulation']]) });
-    expect(svg).not.toContain('hatch-insulation');
+    expect(svg).not.toContain('url(#hatch-insulation)');
     expect(svg).toContain('data-hatch="insulation"');
     expect(svg.match(/<line /g)?.length ?? 0).toBeGreaterThanOrEqual(20);
   });

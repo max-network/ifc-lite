@@ -39,8 +39,8 @@ export function finiteOr0(n: number): number {
 
 /**
  * Whether paper Y runs against drawing Y. A cardinal plan cut projects
- * (x, render z), and render +z is IFC south, so it already reads north-up on
- * a Y-down sheet; sections carry height on drawing Y and must flip.
+ * (x, render z) and render +z is IFC south, so it already reads north-up on a
+ * Y-down sheet; sections carry height on drawing Y and must flip.
  */
 export function sheetFlipsY(plane: SectionPlaneConfig): boolean {
   return plane.axis !== 'y' || plane.customPlane !== undefined;

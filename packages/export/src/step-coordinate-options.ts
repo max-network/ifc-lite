@@ -36,5 +36,27 @@ export interface StepGeoreferencingOptions {
   georefMutations?: {
     projectedCRS?: Partial<ProjectedCRS>;
     mapConversion?: Partial<MapConversion>;
+    /**
+     * The IfcGeometricRepresentationContexts a created IfcMapConversion may convert from, in the planner's order of
+     * preference (`bim.georef` ranks them on the session's created, deleted and edited contexts). The exporter takes
+     * the first one that is still a context when it writes. Absent for a host that does not plan.
+     */
+    sourceCrs?: readonly number[];
   };
+}
+
+/** StepExporter's refusal of georeference edits in an IFC2X3 export, which has no IfcProjectedCRS or IfcMapConversion. */
+export const IFC2X3_GEOREF_REFUSAL = 'Georeferencing creation and editing requires IFC4 or newer. IFC2X3 does not support IfcProjectedCRS or IfcMapConversion.';
+
+/**
+ * True when `error` is {@link StepExporter}'s refusal of `georefMutations` it cannot write (an IFC2X3 export, a
+ * partial position), which a caller may answer by exporting without the edits. Any other error is a real failure.
+ */
+export function isGeorefRefusal(error: unknown): error is Error {
+  return error instanceof Error && error.message.startsWith('Georeferencing ');
+}
+
+/** True when `edits` would change an IfcProjectedCRS or IfcMapConversion. */
+export function hasGeorefEdits(edits: StepGeoreferencingOptions['georefMutations']): boolean {
+  return Object.keys(edits?.projectedCRS ?? {}).length > 0 || Object.keys(edits?.mapConversion ?? {}).length > 0;
 }

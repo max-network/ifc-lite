@@ -11,6 +11,10 @@
     "value": "{ms} ms",
     "reason": "Runtime placeholder with a unit symbol (milliseconds); no English prose."
   },
+  "agentBridge.panel.repeated": {
+    "value": "×{count}",
+    "reason": "Runtime count with a multiplication sign; no English prose."
+  },
   "alignmentSection.axisFallback": {
     "value": "IfcAlignment #{id}",
     "reason": "alignmentSection.axisFallback: IfcAlignment is the exact IFC entity name; the hash introduces the supplied entity identifier."
@@ -1734,5 +1738,33 @@
   "agentBridge.panel.editChange": {
     "value": "{entity} · {field}: {before} → {after}",
     "reason": "Placeholders and symbols only (middle dot, colon, arrow); no English prose."
+  },
+  "siteContext.card.imageryGsd": {
+    "value": "{gsd} m per pixel",
+    "reason": "Italian uses the same wording « per pixel » for a ground sample distance; placeholder and unit symbol only otherwise."
+  },
+  "siteContext.section.radiusValue": {
+    "value": "{radius} m",
+    "reason": "Runtime placeholders with mathematical notation, axis letters, version prefix or unit symbols; no English prose."
+  },
+  "exportCommands.cityjson.label": {
+    "value": "CityJSON",
+    "reason": "Canonical interoperable file format name and extension."
+  },
+  "cityJsonExport.document": {
+    "value": "CityJSON (.city.json)",
+    "reason": "Canonical interoperable file format name and extension."
+  },
+  "cityJsonExport.sequence": {
+    "value": "CityJSONSeq (.city.jsonl)",
+    "reason": "Canonical interoperable file format name and extension."
+  },
+  "a2ui.noValue": {
+    "value": "—",
+    "reason": "Placeholder dash for an empty cell in an A2UI table or card; a symbol, not English prose."
+  },
+  "a2ui.table.group": {
+    "value": "{group} ({count})",
+    "reason": "Group header made only of runtime placeholders (the group value and its row count); no English prose."
   }
 }

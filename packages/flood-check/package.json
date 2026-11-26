@@ -1,6 +1,6 @@
 {
   "name": "@ifc-lite/flood-check",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Headless check of a georeferenced building model against a surface-runoff hazard map (Swiss BAFU provider included)",
   "type": "module",
   "main": "./dist/index.js",
@@ -24,10 +24,10 @@
     "fflate": "^0.8.3"
   },
   "devDependencies": {
-    "@mergifyio/vitest": "^2026.10.11",
-    "@types/node": "^26.6.4",
+    "@mergifyio/vitest": "^2026.11.8",
+    "@types/node": "^26.6.6",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   },
   "license": "MPL-2.0",
   "author": "Louis True",

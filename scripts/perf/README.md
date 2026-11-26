@@ -8,6 +8,122 @@ Citations to `evidence/`, `tests/evidence/` and `docs/architecture/evidence/` pa
 at commit [`f98785c722`](https://github.com/LTplus-AG/ifc-lite/tree/f98785c722); the retained
 bundles left the tree in #9054.
 
+## Flush recesses at touching body interfaces (#10528)
+
+The native load probe produced identical mesh fingerprints on FZK-Haus,
+ISSUE_129, and Holter. Timing from the shared host was variable, so the probe
+establishes output identity on those cases without a throughput claim.
+
+Use the paired source faces to establish the interface. Broadening the
+face-alignment tolerance alone also changed a separate authored recess in
+`rvt01.ifc` and increased slivers. At the exact-kernel fallback, compare with
+the source host before allowing a weld-induced bounds shift to extend the
+cutter through the core.
+
+## Flush recesses beyond a finish strip (#11313)
+
+When a weld changes the rectangle extension decision, check the authored
+box against the source triangles. A box that encloses only air and touches
+the exterior wall face can be skipped. Probe the face beyond the cutter's
+edge as well as inside its footprint. An empty box alone also matches a
+reveal already modeled into the finish, as on wall #6934 in `rvt01.ifc`.
+Require clear passage from the box interior away from the touching cap.
+This catches intersections that even parity can hide in overlapping shells.
+
+The native load probe matched mesh fingerprints on FZK-Haus, ISSUE_129,
+Holter, and `rvt01.ifc`. Timings were within the spread of the shared
+workstation runs.
+
+## Narrow finish strips in the exact fallback (#11275)
+
+The exact route now retains the core in the narrow-strip regression. A
+bounded surface-intersection test covers the area that point parity probes
+miss. It runs only after the welded/source extension disagreement and
+insets the authored box to ignore contact on its flush faces.
+
+Meshes matched the base on FZK-Haus, ISSUE_129, Holter, and rvt01.
+Timing on the loaded host did not establish a throughput change.
+
+## Native finishes for mapped occurrences (#10995)
+
+The worker-pool A/B on AC20-FZK-Haus found no measurable change in parse or
+total time, and the geometry delta was within the base spread. The lookup
+phase was below timer resolution. Mesh fingerprints matched in every round.
+USD requests finishes from the existing native scan and keys its materials
+by finish as well as colour, so per-occurrence styles can share geometry.
+
+## Renderer-first edits: panels settle after the edit (#10535)
+
+**Maintainer decision, measured locally; the qualified Pop number is pending.**
+On the F5 tower an edit published its mutation and, a little later, its
+re-meshed geometry, and every mounted panel re-rendered synchronously for
+both. The worker meshed the column almost at once; its reply then waited
+behind that render, and the scene took the mesh only after a second one.
+
+`useViewerStore` used as a hook now reads a settled state: the live state,
+published synchronously, except while an edit is in flight. From a
+`mutationVersion` change it holds until the edit's re-mesh is in (a hold ends
+after 2 s), its mesh edits have drained and two frames have passed (capped at
+250 ms), or until the user's next input (`INPUT_EVENTS` in
+`settled-store.ts`), in this or a popped-out panel window, which publishes it with `flushSync` before any handler runs. An edit
+made by a form control's own input, change or click is published at once.
+The viewport reads live state inside a `LiveViewerScope`; `getState()` and
+the rest of the store API stay live for writes and staleness checks.
+
+Lessons: narrowing individual subscriptions (#9978, and a per-site prototype
+here) leaves dozens of other live paths into the same render; fixing the
+default and allowlisting the viewport by scope removes them all. Under the
+parity harness the publication must wait a second frame, or it can land
+before the frame that draws the drained edit. A guard test counts the
+component fibers each commit renders during an edit: only the live scope may
+appear.
+
+Publishing on a form control's `input` or `click` was wrong: the browser has
+already written the control's new value, and the re-render writes the old
+controlled value back, so React never sees the change (typed text, checkbox
+toggles). Holding a control's own edit is wrong for the same reason. A click
+outside a form control with no pointer press (`detail === 0`: keyboard,
+assistive technology, `element.click()`) publishes before its handler; a
+pressed click does not, since its `pointerdown` already did, so an edit a
+drag tool commits on `pointerup` stays held. Each new edit restarts the
+close, so it gets its own drain and frames; the first edit's cap still
+bounds the window.
+
+## Hierarchy rows survive a loaded-tower edit (#10535, part)
+
+**Partial lever; the F5 edit target is still open.** A fiber census of one
+loaded-column Move on F5 showed the hierarchy panel committing its whole
+visible subtree (about 3,500 component fibers: rows with tooltips, poppers
+and menus) five times per edit: on the mutation, a follow-up commit, the mesh
+swap and the idle structure build. Each panel render also re-resolved every
+storey row's membership up to three times, and once the session has edits
+each resolution re-reads the relationship overlay. The worker meshes the
+column almost at once; its reply waits behind this main-thread work.
+
+Rows are now memoized with one stable handler object, unchanged tree rows
+keep their objects across rebuilds and projections, and row membership is
+resolved once per input generation and view revision. Paired local
+diagnostics improved the edit and undo medians; unmounting the hierarchy
+entirely bounds what this lever can reach. The figures and the run protocol
+are in the PR; none of them is admission-qualified.
+
+Lesson: narrowing panel subscriptions (#9978) cost more synchronous
+publication than it saved. Cutting what each render does inside the panel
+leaves the subscriptions and the store's publication unchanged. Check a
+"hidden" panel experiment against a fiber census: collapsing the left panel
+keeps the hierarchy mounted and rendering, so it bounds nothing.
+
+## Post-cut sliver bisection removed (#10511)
+
+The native mesh census found one changed wall across the capped fixture
+corpus. ISSUE_171 #528 retained its enclosure and surface area with fewer
+triangles. The cut paths still canonicalize vertices to preserve closure.
+The aspect threshold now only gates the rebuild, and the prism path still
+checks closure before adopting it.
+
+The native load probe kept byte-identical meshes on FZK-Haus, ISSUE_129 and
+Holter, and the optimized WebAssembly engine shrank.
+
 ## Consolidation runs each retention variant once
 
 **Shipped, output-identical.** A consolidation that retains a healthy fold or
@@ -68,15 +184,19 @@ Two tools:
   kill whose victim it could not identify, with the page alive, is `error`. `error` also covers
   any other load error, including main's "Ran out of memory while processing", always, and the
   worker/runtime crash messages that leave the tab alive. Messages are read from the store's load error and dialogs/alerts/toasts, never the whole
-  page. It also reports peak summed Chrome PSS, the cgroup peak, the phase reached and which process
-  types an OOM kill took.
+  page. It also reports peak summed Chrome PSS, the cgroup peak, the phase reached, which process
+  types an OOM kill took, and source tracking (below).
   Needs Linux with cgroup v2 and the memory controller delegated to the systemd user manager;
   anything missing exits 2, never skips.
 
-`--expect` is required. Today the issue is open, so the minimal case runs with
-`--expect killed`: it passes only while the tab is still killed and **fails once the load is
-loaded or refused**, telling you to switch to `--expect not-killed` (the #10264 acceptance:
-the tab is never killed). `error` and `timeout` never pass.
+`--expect` is required. `--expect killed` passes only while the tab is still killed and **fails
+on any other outcome**; unless that outcome is `error` or `timeout`, it tells you to switch to
+`--expect not-killed` (the #10264 acceptance: the tab is never killed). `--expect loaded`,
+`refused` and `awaiting-decision` each pass only that exact outcome. `error` and `timeout` never
+pass. Admission now scales its estimate by the sampled share of dense triangulated geometry
+(`geometryDensity.ts`), so the dense minimal case below is expected to be `refused` after a
+bounded sample (four 256 KiB windows), before the whole source is read. The manual example
+runs it with `--expect not-killed`; the nightly lane below pins it with `--expect refused`.
 
 A viewer may instead warn before an oversized load (a dialog "This model may exceed available
 memory" with Continue loading / Cancel). `--on-memory-dialog wait` (default) reports
@@ -85,11 +205,47 @@ then reports `loaded` or `killed-after-continue`. `--expect not-killed` accepts 
 `refused`, `awaiting-decision` and `cancelled`; a kill after an explicit Continue passes only
 `--expect warned`, and its verdict says so. The warning title, its button names and the refusal
 text come from draft PR #10353 and may drift; they live together in `oom-load-probe-lib.mjs`.
+Source tracking (`oom-load-probe-tracker.mjs`, injected into the page) identifies the picked file
+by object identity: the `File` a file `<input>` delivers, and every `Blob.slice` of it. Only reads
+of those count as source reads (with bytes; "large" means the whole file or at least 1 MiB). A read
+of any other Blob of 1 MiB or more is reported as an unattributed read, never as a source read.
+Every `postMessage` to a worker, a `MessagePort` or a `BroadcastChannel` is scanned whole (nested
+objects, arrays, Maps, Sets and the transfer list, cycle-safe, up to 50,000 objects per message);
+each Blob found is recorded with its time, the receiver (worker script URL), its path in the
+message and whether it was the source. A message beyond the budget is marked `scanTruncated` and
+makes the post verdict `null`. `URL.createObjectURL` of the source and every `new Worker` (with a
+`blob:` flag) are recorded too. The result lists the channels that are not watched
+(`channels.notInstrumented`: copies of the source as ArrayBuffer or stream, whose producing read
+is counted as a source read; reads and fetches inside workers; SharedWorker/ServiceWorker;
+IndexedDB/Cache API), so a `false` means only that every listed instrumented channel reported none.
+Counts and the facts the verdicts use (first and largest source read, first large source read,
+first unattributed read, first source post) are kept for every event; only the detailed event log
+is bounded (first and last 100 per kind, with `truncated` and the number dropped), and no flag is
+computed from it. Dialogs, alerts and toasts are stamped every time their text changes, and the
+store's load error by a subscription the moment it is set. If a decision was only seen by the
+probe's 2 s poll, an event inside that window has unknown order (`null`). Peak summed PSS is
+sampled every 500 ms; the cgroup peak is the kernel's exact high-water mark.
+
+`--watch-url URL` records every request to that origin in the page (`fetch` and `XMLHttpRequest`,
+on the page clock); the driver's view of the same requests is kept only for the browser's error
+code. The time origin is the page's own pick stamp, taken when the tracker marks the source, so
+every order is on one clock; without it (source never marked) every order is `null`. The probe
+builds a timeline relative to that pick: server attempts, dialogs (stamped when they
+appear), the store's load error, source reads, unattributed reads and worker posts. Each derived
+flag (`attemptBeforeDecision`, `readBeforeDecision`, `unattributedReadBeforeDecision`,
+`sourcePostBeforeDecision`) is `true`, `false` only when the instrument that would have seen the
+event was installed and reported, or `null`. `--expect-server-first` additionally requires a
+server attempt before the warning or refusal and no large source read or source post before it;
+a `null` fails it. Only requests at or after the file pick count as this load's attempt;
+earlier ones are reported as `startupRequests`. If the picked file was never marked (it arrived
+without a file-input `change` event), or an unattributed read or worker post of at least 1 MiB
+happened before the decision, the identity-dependent flags are `null` with the reason in
+`unknownBecause`.
 
 ```bash
 pnpm install && pnpm build:wasm && pnpm turbo build --filter=@ifc-lite/viewer   # or any built apps/viewer/dist
 npx playwright install chromium                            # once
-node scripts/perf/oom-load-probe.mjs --dist apps/viewer/dist --expect killed \
+node scripts/perf/oom-load-probe.mjs --dist apps/viewer/dist --expect not-killed \
   --kind tfs --target-mb 300 --device-memory 4 --cores 4 --cap 3G   # swiftshader, headless
 # Hardware GL: headed on a private Xvfb, e.g. DISPLAY=:181 ... --gl hardware
 ```
@@ -121,10 +277,16 @@ scene, so treat it as a `timeout`, not a pass. These numbers are not comparable 
 campaign runs that put the driver process inside the cap as well: there tfs-225 was killed on
 hardware, here it loads with about 90 MiB to spare.
 
-CI: not wired. Per-PR CI is too heavy (a viewer build plus a ~1 min browser run). The proposed
-home is a `workflow_dispatch`/nightly job, added only once the cap is verified on a GitHub-hosted
-runner: that needs `systemd-run --user` with a delegated memory controller there, or the job run
-inside a container with `--memory=3g --memory-swap=3g`. Neither was verified from here.
+CI: `.github/workflows/oom-load-probe.yml`, nightly and `workflow_dispatch`, not a PR gate (a
+viewer build plus two browser runs). It starts the runner user's systemd manager with
+`loginctl enable-linger` so `systemd-run --user` works on a hosted runner, then pins each case's
+outcome: dense 300 MB at a reported 4 GB / 3 GiB is `refused`, dense 1100 MB at a reported
+8 GB / 6 GiB is `awaiting-decision`. If the hosted runner does not delegate the memory controller
+to the user manager, the probe's preflight exits 2 and the lane is red, never skipped. First
+hosted run (ubuntu-latest, 2026-11-19, run 44519558141): the user manager delegated
+`cpu memory pids`; 300 MB at 4 GB was `refused` before open after five source reads (the 4 KiB
+header, then four 256 KiB sample windows; no OOM kill), and 1100 MB at 8 GB was
+`awaiting-decision` after the 4 KiB header.
 
 ## Gaussian capture memory ownership (#9018, #10401)
 
@@ -133,6 +295,32 @@ inside a container with `--memory=3g --memory-swap=3g`. Neither was verified fro
 - **The decode worker must not read the file whole.** It held the file bytes plus a materialized table, invisible to the page-heap metric. It now range-reads chunks through upstream's lazy reader. Measure memory across all isolates (page and workers) as well as the page heap. Otherwise moving work into a worker can fake a pass.
 - **The retained budget is sampled before GC.** Per-slice garbage counted against it until the decoded buffers were recycled back to the worker, normalization was done in place and staging was kept small.
 - **The trade:** placement edits, device-loss recovery and SH-layout changes re-read the source instead of reusing a CPU copy. A validating summary pass precedes streaming. It runs in parallel helper workers owned by the decode worker, so the first visible frame did not regress.
+
+## Streaming native `.ifclite` writer (#9584 slice 3, `ifc-build-cache`)
+
+**Accepted: streaming lowers peak RSS on Holter.** The admitted Pop run compared the release builds at `ee77162e0` and `48a4873a0` over five interleaved rounds at eight threads. All three writers produced byte-identical caches on all three fixtures. Streaming lowered Holter's peak by 35.8% versus the base and 29.2% versus the branch's in-memory writer. O-S1 and AC20-FZK-Haus stayed within measurement noise. [Paired run and provenance](https://github.com/LTplus-AG/ifc-lite/pull/10361#issuecomment-7042221543)
+
+The shared-host measurements below are diagnostic.
+- The base below is slice 2 before the rebase (`5093d52f3`), not the merge base `ee77162e0`; the fleet run measures against the latter.
+- Byte identity: base (slice 2, `5093d52f3`) in-memory, branch in-memory and branch streamed caches compared with `cmp` on every model below: all identical. Tests: `rust/cache/tests/streamed_matches_in_memory.rs`, `src/stream_tests.rs` (1-, 7- and 1024-job batches).
+- Peak RSS (`/usr/bin/time -l`, MiB, mean of 2 runs, release, Apple M2 Pro 10-core 16 GB, macOS 26.5.2, shared host with load 4-6). Floor is `examples/pipeline_floor.rs` (the same geometry pass, meshes dropped, nothing written); "data model" is `ifc-build-cache --no-geometry`; the open chunks can hold up to 8 MiB plus one mesh per cell, and "open" is their measured peak:
+
+| Model (source MB) | Meshes | Cells / open | Floor | Data model | Base in-memory | Branch in-memory | Streamed |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| AC20-FZK-Haus (2.5) | 285 | 5 / 1 | 20 | 14 | 27 | 27 | 28 |
+| ISSUE_129 (12) | 1,402 | 21 / 6 | 106 | 84 | 158 | 153 | 159 |
+| dental_clinic (13) | 5,927 | 16 / 14 | 87 | 120 | 177 | 174 | 170 |
+| FM_ARC_DigitalHub (14) | 4,058 | 17 / 19 | 100 | 77 | 134 | 150 | 149 |
+| 01_BIMcollab_Example_ARC (18) | 7,846 | 10 / 12 | 106 | 93 | 167 | 163 | 162 |
+| advanced_model (35) | 11,472 | 9 / 35 | 165 | 230 | 463 | 475 | 401 |
+| schependomlaan (49) | 6,062 | 6 / 8 | 128 | 245 | 322 | 246 | 242 |
+| ISSUE_068 (56) | 16,777 | 17 / 36 | 277 | 377 | 646 | 628 | 505 |
+| Holter_Tower_10 (177) | 110,633 | 43 / 107 | 557 | 907 | 1,492 | 1,470 | 1,098 |
+
+- The streamed peak stays at or about the data-model peak plus the pipeline floor (under their sum on eight models, a few MiB over on advanced_model), so the writer adds no mesh-proportional memory beyond its open chunks; on the larger models it sits well under the in-memory one; the gap is the retained mesh set and grows with it. Streamed peak is not flat in model size: the data model (entity index, strings, relationship tables) and the pipeline's own floor both grow with the source, and on Holter the data-model phase alone is the larger part. Wall time moved within the host's noise; no timing claim.
+- Tried and dropped: running the geometry pass before the data model. It did not lower the peak (one Holter run read slightly higher), because the allocator keeps the first phase's pages for the second.
+
+Lesson: streaming removes the retained mesh set, while the data model and the geometry pipeline's own working set still contribute to peak RSS. Source file size alone does not predict the saving. Further reductions depend on which phase sets the peak on the model being measured.
 
 ## Reopen interactive mark with a geometry-restore gate (#10218, merged)
 
@@ -867,6 +1055,54 @@ not only the byte total, and measure boot with each build in both A/B positions:
 shared host, position alone moved the result by about 15 ms. A group that claimed every
 QuickJS module also failed, because the one eager module in it made the whole group eager.
 
+## Work-budget refusal diagnostics (#9268)
+
+**Retained: detailed refusals behind cold error carriers.** Adding demand and
+budget identity enlarged the errors returned by per-attempt admission helpers.
+An owned four-byte slot token keeps logical detail in a synchronized registry
+accessed only on refusal; drop reclaims the slot, including across threads.
+The walk's demand payload stays boxed. Allocation occurs only on refusal. The walk
+keeps its existing Result types, with a compile-time bound against the decoder
+error carrier on both native and wasm32. Empty routers hold only a nullable
+pointer to the refusal log; the buffer, identity strings and refusal constructors
+are cold work. The public diagnostics remain complete and the work allowances
+stay unchanged. RTC geometry probing is outlined so its refusal handling cannot
+enlarge the loop that filters every model record. The native instruction comparison and output counts are recorded in
+PR #9386; this is cost containment, not an end-to-end worker-pool speedup claim.
+
+Verdict: **accepted performance exception, user-approved 2026-11-10**. The
+matched native instruction comparison retains a small fixed regression for the
+correct diagnostic, with identical output counts and a passing full functional
+suite (official job `29f590e6`, PR #9386). Four levers were tried: vector
+pre-sizing, the retained four-byte logical-refusal token, lazy aggregate
+diagnostic storage, and a diagnostic handle in existing padding. Restoring
+the logical Result and diagnostic/stat aggregates to main's sizes left equal
+growth-call counts and the same growth-helper self-cost increase. The attribution verdict is a fixed
+code-placement/compiler effect, rather than new refusal recording work on
+accepted items. The latter two aggregate experiments were rejected and
+reverted. Detailed numbers and attribution stay in the PR; this is an approved
+correctness trade-off, not an end-to-end speedup or a wall-clock claim.
+
+Lesson: refusal-only reporting can still affect successful work through error
+layout. Shrinking an entire Result can also change its optimized callers;
+contain the cold payload while preserving the common carrier, then check the
+compiled pipeline. A boxed logical error kept the unit Result pointer-sized but
+widened the intermediate Result carrying a u32; assertions now cover the token,
+the value Result and the unit Result against main's layouts. No registry access
+or identity construction occurs for accepted work.
+Type-product attribution fits inside the existing owned type-map root slot,
+with size/alignment assertions, rather than adding an owner field to every
+mapping controller. A persistent dedup set and capped details run only on
+refusal; retained transactions return their refusal without a second unread log.
+Occurrence attribution attaches the owning product only from the existing
+execution error arm. A second acceptance dispatcher, even with a lazy owner
+callback, regressed successful work; restore the original monomorphic acceptance
+path. A boxed execution error carries the refused transaction back to the
+product without changing the controller or successful Result sizes; only that
+cold error arm attaches identity. Instruction attribution also needs the
+allocation call graph: identical growth-call counts can still cost more when
+compiler inlining changes, outside the mapping controller itself.
+
 ## Georeference minimap waits for scene settlement (#9623)
 
 **Untimed diagnostic, pending scoreboard confirmation.** The minimap already
@@ -938,8 +1174,177 @@ Mutation modules name their load-time encoder initializer explicitly so unused
 modules can be tree-shaken safely. Prepared-operation execution loads after the
 asynchronous action has copied its inputs and private checkpoints.
 
-Timing qualification and the F5 verdict are still pending; no measured scale
-acceptance is claimed by the structural guard alone.
+The residual candidate completed the full paired authoring cohort and the
+sustained default-heap witness, but its first post-fill wall insertion regressed
+at smaller sizes. Ordinary operation tracing located the long insertion in the
+process-wide attribute-barrier WeakMap, after session-wide garbage collection.
+Record-owned, non-enumerable metadata removes that shared insertion table while
+keeping shared accessors and detached clone semantics. The allocation regression
+asserts that observing new rows does not insert into a process-wide weak table.
+The corrected candidate still needs fresh timing qualification. The original
+F5 attempt stopped at its GPU prelaunch guard without collecting a timing sample;
+its target remains unmet. Do not treat the completed authoring cohort or a
+passing structural guard as a no-regression verdict.
+
+Lesson: reducing retained allocation does not by itself bound the next edit's
+latency; weak-table maintenance can charge an entire session to one insertion.
+
+The record-owned candidate preserved the sustained witness and the small-model
+wall insertion returned to the base range. Its original screen then stopped on
+consistent hosted-window regression, leaving larger authoring pairs and F5
+unrun. A paired ordinary allocation diagnostic found identical graph/journal
+cardinality but extra per-row serialization calls in `finishHistory`: the old
+path cloned the appended journal as one array. Clone only that appended batch
+at one boundary, preserving draft detachment and avoiding serialization setup
+per mutation. The batching correction remains unqualified until fresh
+acceptance; neither earlier candidate's samples qualify it.
+
+The batched candidate still stopped on the original hosted-window screen.
+Record metadata had extra installation calls, but bounded CPU attribution did
+not establish that as the cause: both sources used dictionary properties and
+attribute observation had the same sparse sample count. Do not trade away its
+clone or alias contracts on call counts alone. A cold engine-event diagnostic
+instead exposed additional deoptimizations in empty typed override lookup and
+the new proxy reference-slot dispatch. Empty override indexes need no typed
+lookup; the proxy already knows whether its base is an entity map. Those
+bounded corrections retain nonempty and unresolved-source candidates and still
+require timing qualification.
+
+The cold-path follow-up removed only the proxy dispatch deoptimization. The
+original session still had an unrelated source override, so its override index
+was not empty. The opening candidate path decoded that unrelated relationship
+and resolved schema attributes just to reject its class, unlike canonical
+source enumeration. Classify only the sparse source override domain through
+that canonical iterator first; retain missing class metadata conservatively,
+and do not enumerate the created bucket again. The real IFC regression locks
+out unrelated payload reads while retaining source retypes, deletion and
+unreadable-host refusal. The original bounded allocation diagnostic then
+matched base's clone count and graph/journal cardinality. Throughput remains
+unqualified until the unchanged acceptance protocol passes.
+
+
+The corrected source `7f4becc2` completed the original exclusive cohort
+`f81010cd`: all authoring pairs, the sustained default-heap witness, and all
+hardware F5 runs were recovered from the original receipt after a client-host
+shutdown. STEP/mesh/undo identities match the frozen base. Retained authoring
+memory is lower, selected joins stay bounded as unrelated openings grow, and
+the fixed-height planner's warm query avoids product payload reads; its cold
+index still reads the product inventory and required writes remain unchanged.
+
+**Verdict: improvements measured; overall acceptance not satisfied.** The small
+hosted-window insertion remains slower beyond the run's observed interquartile
+noise floor. Wall insertion and several larger-size cells have unresolved
+scatter, so neither an early-stop escape nor a median paired ratio establishes
+blanket no-regression acceptance. The original screen is a stop condition, not
+a slowdown allowance. A matching authoring A/A reference was not collected.
+
+Both sources fail the unchanged F5 edit-latency target. Load, orbit, five real
+edits and undos, hardware admission, fixture identity and mesh counts pass;
+the separate profile edit is excluded from those five timings. Existing phase
+measurements put most elapsed edit time after the mutation, through mesh
+replacement and drain. That localizes further investigation but does not
+identify a single rendering cause or waive the target. The issue's three
+residual mechanisms have supporting evidence; a full issue or row pass and
+push remain blocked. Do not rerun blindly or turn exit status into a verdict.
+
+Maintainer scope decision: the broader loaded-tower latency target is now
+tracked separately in #10535. This PR must still remove the small-session
+hosted-window slowdown and preserve the measured authoring gains under the
+original paired noise gate; the F5 failure is not relabelled as a pass.
+
+Preparation lesson: a viewer/typecheck build does not guarantee the CLI loader
+used by the external SDK worker exists. The preceding cohort failed before
+model creation, with no operations or fresh pairs. Repair only the missing
+generated CLI graph and check every required protocol artifact before another
+exclusive window; preserve that failed receipt instead of reusing its outputs.
+
+
+The singleton-journal correction stores one mutation identity directly and
+promotes only multi-row entity buckets to sets. A fail-first resource invariant
+locks the allocation bound, while promotion, indexed removal and exact order
+retain their contracts. The recovered final cohort `46a0ecd6` completed every
+original authoring pair and the branch's sustained default-heap witness.
+Its source and descendants finalized unchanged after a client interruption;
+no timing was replayed.
+
+**Scoped verdict: land the gains with an explicitly accepted small-session
+trade-off; the full noise gate did not pass.** The user accepted the remaining
+`session/1000/addHostedWindow` cost after the bounded correction failed.
+Follow-up [#10555](https://github.com/LTplus-AG/ifc-lite/issues/10555) tracks that
+fixed cost. F5 latency remains separately unmet in #10535; cold planning still
+builds its inventory with N+1 reads.
+
+Historical cohort `46a0ecd6` covered measured implementation `b8cd2415` versus
+captured main `80f01cc5`, including path-identical rebased/ledger head `a7882871`.
+Its gate was accepted for those trees only. The round-3 correctness fixes
+changed the timed mutation, relationship and planner paths, so the old gate
+does not cover those fixes.
+
+Original exclusive cohort `ca7d9f29` covers implementation `0e280a3f` and this
+final documentation-only head: production and test trees are unchanged from
+that implementation. All original pairs completed; 38 of 39 registered rows
+passed. Storey, join and planner gains held, memory was lower, and the fresh
+main default-heap witness exhausted its heap while the branch completed its
+sustained edit/export witness. This is an accepted scope trade-off, not a
+claim that all rows passed. The one failed row, 1K hosted-window insertion,
+was +4.26%; the same row improved approximately 13% at 10K and 31% at 50K.
+[The full original gate](https://github.com/LTplus-AG/ifc-lite/pull/10420#issuecomment-6931259750)
+retains source pins, pairs, identities and the unchanged noise-floor rule.
+
+One bounded empty-opening shortcut was tested in original exclusive row job
+`3ce943f6`. At 1K it measured 4.70 to 4.94 ms, about +0.24 ms per call, above
+its approximately 3.0% noise boundary; it did not recover the regression.
+That candidate (`bb492a5e`) is discarded and absent from this PR. Its evidence
+is preserved, not reused as a passing measurement of the retained code.
+[The bounded attempt](https://github.com/LTplus-AG/ifc-lite/pull/10420#issuecomment-6933690407)
+records the failed row and passing 10K guard separately.
+
+Lesson: ordinary profiles locate added fixed work in cold empty-opening
+discovery, reference-slot queries and temporary candidate collections. A
+shortcut removed countable query/allocation work but did not recover the 1K
+throughput, so the profile lead is not a complete causal explanation. Keep
+the accessor/alias, retained-draft journal and planner ownership correctness
+contracts; do not infer latency from allocation counts or relax the gate.
+The user explicitly accepted the small absolute cost to retain the broader
+gains, with further investigation bounded by #10555.
+
+## Rectangular-cut diagnostics measure area and volume (#10510)
+
+Equal triangle counts can hide a real cut. Accepted rectangular cuts now
+compare the input and final surface area and volume before the load report
+identifies the host as unchanged. The real-model cohort included a cut with
+nearly identical area and a substantial volume reduction, so both measurements
+matter. Native load probes compare mesh fingerprints because this changes the
+diagnostics the loader emits while retaining the mesh output.
+
+## Small void classes walk canonically (#10555)
+
+#10420's first hosted window in a 1K session exceeded the regression boundary. Phase timing through the real session API put
+the extra cost in `readHostOpeningExtents` for an empty void class. It came
+from the source projection, two reference-slot queries, override
+classification (the session carries one source override) and V8 compiling
+that path on first use. The rejected bb492a5e skipped only the slot queries.
+Removing work from that call also moved its cold cost elsewhere: the
+`addOpeningToStore` pre-registration became the slot code's first execution.
+
+When both the authored and effective counts of `IfcRelVoidsElement` are at
+most 32, `readHostOpeningExtents` takes the canonical class walk in reference
+order. The pre-registration query is gone. Larger classes keep the #10420
+candidate path and build the projection on the first query. Fail-first
+tests pin "no slot query or override classification" for a small class and
+for a session's first windows.
+
+Exclusive Pop cohort `cc8c640c-5faf-486d-bc5f-8aa21a646c7a` measured
+`b2dba7ba7e` against the exact #10420 parent `33339ce582`. It used the
+unchanged session worker, five fresh pairs per size, the original quiet
+guard (GPU samples all 0%, 0.51 busy cores) and the unchanged own-noise-floor
+gate. Prepared identities and the WASM matched.
+
+The original gate passed at 1K, 10K and 50K. The branch was faster in every pair at every size. Two earlier submissions
+were refused by the quiet guard on GPU load from the Pop desktop compositor;
+they recorded no timings. Still open, and not a registered row: a second
+window on a wall that already has an opening costs more after #10420
+(`readHostedFill`); see #10555.
 
 ## First selection reads typing relationships from the graph (#9192)
 
@@ -1727,6 +2132,14 @@ slice by the phases it changes and by output identity, not by a ±2% move in an 
 | C5b opening source probe/classifier | identical | BWK −1.7% (±3), Holter +2.5% (±18), ISSUE_098 +0.7% (±12), ISSUE_068 −1.5% (±17), schependomlaan −1.6% (±5), ISSUE_129 −1.7% (±5) vs D3 base c282c7bebf | neutral: owned classify/probe on every opening host, all deltas inside noise |
 | C5c opening gateway cutover | identical | BWK +1.2% (±8), Holter −0.4% (±9), ISSUE_098 +2.9% (±33), ISSUE_068 −3.1% (±55), schependomlaan +0.3% (±11), ISSUE_129 +1.1% (±14) vs C5b | neutral within noise; fingerprints identical on 6 models and 122/122 corpus models; deterministic FZK instruction ratchet is the strict check |
 
+## Recovering rejected cuts on touching shells (#10512)
+
+Manifold-gated recess cuts can fail when adjoining wall bodies leave internal
+faces in the merged host. The retry certifies complete consecutive shells,
+unites them without losing volume, and cuts with the original recess depth.
+The shell scan runs only on a gate rejection. Builds without the manifold gate
+keep the existing void routing.
+
 ## Exact rectangular opening union (#7941)
 
 **Native attribution complete; browser qualification remains pending.**
@@ -1998,6 +2411,17 @@ Node consumer runs before and after produced identical mesh/triangle counts and
 byte-identical GLB exports for the committed wall and ArchiCAD FZK fixtures. See
 `tests/evidence/packed-workflows/worker-packaging.json`. Keep the external Vite
 bundle in acceptance: a Node-only WASM pass cannot prove worker asset closure.
+
+## Oblique partial finishes at a recess floor (#11278)
+
+Deferring a proved partial oblique interface to the exact cut removes the
+membrane in the rotated fixture. The source quads must share corners and
+the wider projected rectangle must cover the aperture. This keeps the
+proof grounded in the source mesh when projected corners differ by f32
+rounding.
+
+Meshes matched the base on FZK-Haus, ISSUE_129, Holter, and rvt01.
+Timing on the loaded host did not establish a throughput change.
 
 ## Several cutting planes: caps and clip cost (#7545)
 
@@ -2699,6 +3123,24 @@ representation from the final load metric. Preserve true sticky keys and the
 canonical parser; defer mechanisms whose correctness or end-to-end verdict
 remains incomplete. [Raw dispositions and prerequisites](https://github.com/LTplus-AG/ifc-lite/blob/f98785c722/scripts/perf/evidence/deferred-worker-mechanisms-6537/README.md)
 retain source attribution and the excluded attempts.
+
+## Repeated-key affinity cap (#8451, #9466)
+
+The cap preserves sticky assignment for small keys and reconsiders a hot key's
+owner in bounded runs. A fresh-browser comparison with the same WASM on both
+revisions showed faster worker-pool completion on the repeated-cube model in
+flat and instanced modes. The shared host was under CPU and swap pressure, so
+the timings are exploratory. The mixed-model overhead still needs a quiet-host
+verdict. Thanks to @ionuting for reporting the bottleneck.
+[#9466](https://github.com/LTplus-AG/ifc-lite/pull/9466)
+
+Flat mesh fingerprints matched. The hot key's instanced shard and template
+partition changed while reconstructed occurrences, picking IDs and packed
+appearance matched. A hardware Metal witness on cubes past the cap matched
+entity picks and framebuffer bytes. For a scheduling change, compare the
+canonical occurrences and rendered results as well as the raw shard bytes.
+Shard-layout changes can follow the new worker partition, so a matching
+occurrence count alone cannot establish equivalence.
 
 ## Known-explicit orientation: rejected, do not ship (#6537 / #6788)
 
@@ -5696,6 +6138,20 @@ real heavy-model cuts even though small synthetic cases remained green; the
 heavy census caught that overreach, and restoring the old horizontal route
 removed every branch-caused census delta.
 
+## Flush recesses on inward-wound source shells (#11276)
+
+The inward-wound recess fixture loses its extra membrane when the wider
+source face is identified by containment. A side wall at a corner
+exclusive to that face must extend beyond the authored cap for either
+signed-area group. Containment by itself could select a wider finish.
+
+The manifold-gated retry reorients uniformly inward-wound closed shells
+before the union. Mixed winding can represent a cavity and stays outside
+that recovery.
+
+Meshes matched the base on FZK-Haus, ISSUE_129, Holter, and rvt01.
+Timing on the loaded host did not establish a throughput change.
+
 ## Hole-wall winding and host-derived wall frames (#5410)
 
 Correctness change, no performance claim. Extruded profile holes now emit side
@@ -7656,3 +8112,12 @@ Between the index and the prepass styles the gap grows by about 150 ms on Holter
 3. Re-measure.
 
 The spike's read-overlap pieces are kept on branch spike/streaming-scan: reader worker + watermark, slice scan with offset correction, and pool adoption.
+
+## Size optimization for the main WASM engine's export crate (#10707)
+
+The structural carriers exceeded the engine bundle ceiling even after the two
+STEP writers shared their conversion prepass. Compiling only the export crate
+for size recovers the space with byte-identical STEP and GLB output on the
+ArchiCAD FZK-Haus sample. STEP conversion trades some throughput for the
+smaller bundle. GLB export timing was comparable and native builds retain
+their existing optimization level.

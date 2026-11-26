@@ -32,8 +32,7 @@ import type { EffectiveEntityIndex } from './effective-index.js';
 // therefore correct and deliberate -- nothing here calls it, and the import
 // erases.
 import type { createSourceRefReader } from './source-ref-bounds.js';
-import type { Ifc2x3SlotFill } from './schema-converter-ifc2x3-slots.js';
-import type { Ifc4SlotCheck } from './schema-converter-ifc4-slots.js';
+import type { Ifc2x3SlotFill } from './schema-converter-ifc2x3-slots.js'; import type { Ifc4SlotCheck } from './schema-converter-ifc4-slots.js';
 import type { EnumReconciliation } from './schema-converter-enums.js';
 import type { StepCoordinateNormalizationOptions, StepGeoreferencingOptions } from './step-coordinate-options.js';
 import type { TypeQuantitySource } from './step-type-owned-quantities.js';
@@ -119,12 +118,9 @@ export interface StepExportOptions extends StepCoordinateNormalizationOptions, S
    * source used for `SpatialAnchor.guidRandom` to close that gap. Default
    * (omitted) behaviour for THESE ids is unchanged: random.
    *
-   * NOT the `IFCPROXY` placeholders any more (#2733). Those used to be minted
-   * from this source too, so an omitted `guidRandom` made every downgraded
-   * IFC4X3 entity differ on re-export. They are now derived from the source
-   * line when this is omitted, and only fall back to this source when it is
-   * supplied - so passing a seeded source still pins them, but NOT passing one
-   * no longer makes them random. See `convertStepLine`.
+   * Alignment proxies use this source when supplied and derive an ID from
+   * the source line otherwise (#2733). Other unrepresented rooted entities
+   * keep their GlobalId or use a shared deterministic fallback (#11322).
    */
   guidRandom?: RandomSource;
   /**
@@ -186,10 +182,10 @@ export interface StepExportResult {
      * shipped dangling — see {@link relationshipWithheldWarning}. This can
      * happen on a plain full export with no options set at all, so it is
      * reported rather than left to be discovered by a diff.
-     *
      * Same `string[]` shape as `MergeExportResult.stats.warnings`.
      */
     warnings: string[];
+    /** The `warnings` the georefMutations phase raised: an edit it refused or wrote only in part. */ georeferencingWarnings?: string[];
   };
 }
 
@@ -372,6 +368,7 @@ export interface ExportPass {
   readonly detachedRelatedObjects: Map<number, Set<number>>; // shared rel → elements copied on write off it (#5794)
   readonly newGeorefLines: string[];
   readonly warnings: string[];
+  readonly georeferencingWarnings: string[]; // the `warnings` the georef phase added (stats.georeferencingWarnings)
   /** The slots an IFC2X3 downgrade must settle: `OwnerHistory` by reuse
    *  (#4686), every other required slot from the generated table (#4714). The
    *  owner history is settled by `export()` once `willBeEmitted` can answer,

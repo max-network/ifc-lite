@@ -10,7 +10,7 @@
  * testable without mounting React.
  */
 
-import { exportAnonymizedSubset, type AnonymizeOptions, type AnonymizeResult } from '@ifc-lite/export';
+import type { AnonymizeOptions, AnonymizeResult } from '@ifc-lite/export';
 import type { IfcDataStore } from '@ifc-lite/parser';
 import { downloadFile, sanitizeFilename, stripExtension } from '@/lib/export/download';
 
@@ -38,8 +38,14 @@ export function anonymizedStem(fileStem: string): string {
  * report stats/warnings. The old->new GlobalId map is deliberately NOT
  * offered for download here (the CLI has `--guid-map` for local correlation).
  */
-export function runAnonymizedExport(args: RunAnonymizedExportArgs): AnonymizeResult {
-  const result = exportAnonymizedSubset(args.store, args.includedIds, args.options);
-  downloadFile(result.content, `${anonymizedStem(args.fileStem)}.ifc`, 'text/plain');
+export async function runAnonymizedExport(args: RunAnonymizedExportArgs): Promise<AnonymizeResult> {
+  const { result, filename } = await produceAnonymizedExport(args);
+  downloadFile(result.content, filename, 'text/plain');
   return result;
+}
+
+/** Same native anonymizer without a browser download side effect. */
+export async function produceAnonymizedExport(args: RunAnonymizedExportArgs) {
+  const { exportAnonymizedSubset } = await import('@/lib/export/step-export-runtime');
+  return { result: exportAnonymizedSubset(args.store, args.includedIds, args.options), filename: `${anonymizedStem(args.fileStem)}.ifc` };
 }

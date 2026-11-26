@@ -7,7 +7,7 @@
 import { createRequire } from 'node:module';
 import { describe, expect, it, vi } from 'vitest';
 
-// Runtimes that report `process.versions.node` without being Node (workerd) cannot resolve `@xmldom/xmldom`, so importing must not load it.
+// workerd reports `process.versions.node` but cannot resolve `@xmldom/xmldom`, so importing must not load it (#10961).
 // The loader reaches xmldom through createRequire, which vi.mock does not see; the CJS require cache does.
 const require = createRequire(import.meta.url);
 const xmldomEntry = require.resolve('@xmldom/xmldom');
@@ -22,7 +22,7 @@ const MINIMAL_IDS = `<?xml version="1.0" encoding="UTF-8"?>
   </specifications>
 </ids>`;
 
-describe('parseIDS xmldom fallback', () => {
+describe('parseIDS xmldom fallback (#10961)', () => {
   it('does not load @xmldom/xmldom when the module is imported', async () => {
     expect('DOMParser' in globalThis).toBe(false);
     delete require.cache[xmldomEntry];

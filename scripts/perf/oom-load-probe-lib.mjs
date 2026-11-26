@@ -41,16 +41,13 @@
  * them in sync with the viewer.
  */
 
-export const OUTCOMES = Object.freeze(['loaded', 'refused', 'awaiting-decision', 'cancelled', 'killed', 'killed-after-continue', 'error', 'timeout']);
+import { REFUSAL_MESSAGE } from './oom-load-probe-server.mjs';
+export { REFUSAL_MESSAGE, MEMORY_WARNING, SERVER_FIRST, expectFlags, serverAttemptSummary, polledErrorEvent } from './oom-load-probe-server.mjs';
 
-/** Pre-read refusal (#10353): "This IFC file exceeds this tab's local processing memory budget ...". */
-export const REFUSAL_MESSAGE = /local processing memory budget/i;
+export const OUTCOMES = Object.freeze(['loaded', 'refused', 'awaiting-decision', 'cancelled', 'killed', 'killed-after-continue', 'error', 'timeout']);
 
 /** Main's out_of_memory explanation (load-error-message.ts): a failure after processing started. */
 export const OOM_FAILURE_MESSAGE = /ran out of memory while processing/i;
-
-/** Title of a pre-load memory warning that lets the user continue or cancel (#10353). */
-export const MEMORY_WARNING = /may exceed available memory/i;
 
 /** Accessible names of that warning's buttons (#10353). */
 export const DIALOG_BUTTONS = Object.freeze({ cancel: /^cancel$/i, continue: /^continue loading$/i });
@@ -178,6 +175,8 @@ export const EXPECTATIONS = Object.freeze({
   warned: ['loaded', 'refused', 'awaiting-decision', 'cancelled', 'killed-after-continue'],
   loaded: ['loaded'],
   refused: ['refused'],
+  // The consent dialog at a reported 8 GB, left unanswered (nightly lane, #10264 A2).
+  'awaiting-decision': ['awaiting-decision'],
 });
 
 /**
@@ -236,6 +235,11 @@ export function optionErrors(v) {
   if (v['cpu-quota'] !== undefined && !/^\d+%$/.test(v['cpu-quota'])) errors.push(`--cpu-quota must look like 400%, got '${v['cpu-quota']}'`);
   if (v.gl !== undefined && !['swiftshader', 'hardware'].includes(v.gl)) errors.push('--gl must be swiftshader or hardware');
   if (v['on-memory-dialog'] !== undefined && !['wait', 'cancel', 'continue'].includes(v['on-memory-dialog'])) errors.push('--on-memory-dialog must be wait, cancel or continue');
+  if (v['watch-url'] !== undefined) {
+    let ok = false;
+    try { ok = ['http:', 'https:'].includes(new URL(v['watch-url']).protocol); } catch { ok = false; }
+    if (!ok) errors.push(`--watch-url must be an http(s) URL, got '${v['watch-url']}'`);
+  }
   return errors;
 }
 
@@ -281,3 +285,31 @@ export function oomAccounting(events, totalKills = 0) {
   return { kills: Math.max(totalKills, seen), types, unidentified, ambiguous };
 }
 
+/**
+ * The viewer's "CPU geometry held" sample (#10264 S0, `__ifc_lite_cpu_geometry_held__`) in MiB, with
+ * bytes per triangle when the triangle count is known. `null` when the viewer has no such hook.
+ */
+export function cpuGeometrySummary(held, triangles) {
+  if (!held || typeof held.totalBytes !== 'number') return null;
+  const mib = (b) => Math.round((b / 2 ** 20) * 10) / 10;
+  const owners = {};
+  for (const [name, o] of Object.entries(held.owners ?? {})) owners[name] = { reachableMiB: mib(o.reachableBytes), exclusiveMiB: mib(o.exclusiveBytes) };
+  const byKindMiB = {};
+  for (const [kind, b] of Object.entries(held.byKind ?? {})) byKindMiB[kind] = mib(b);
+  return { totalMiB: mib(held.totalBytes), totalBytes: held.totalBytes, buffers: held.buffers, sharedMiB: mib(held.sharedBytes ?? 0), byKindMiB, owners,
+    bytesPerTriangle: triangles > 0 ? Math.round((held.totalBytes / triangles) * 10) / 10 : null, walkMs: Math.round(held.walkMs ?? 0) };
+}
+
+
+// Keep diagnostic failure distinct from a viewer version without the hook (#10506).
+export async function sampleCpuGeometry(evaluate, triangles, timeoutMs) {
+  try {
+    return await withTimeout(Promise.resolve().then(evaluate).then(raw => {
+      if (raw === null || raw === undefined) return { status: 'unavailable' };
+      const held = cpuGeometrySummary(raw, raw.triangles ?? triangles);
+      return held ? { status: 'available', held } : { status: 'error', error: 'Invalid CPU geometry diagnostic result' };
+    }), timeoutMs, () => ({ status: 'timeout' }));
+  } catch (error) {
+    return { status: 'error', error: error instanceof Error ? error.message : String(error) };
+  }
+}

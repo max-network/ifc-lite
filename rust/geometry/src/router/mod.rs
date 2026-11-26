@@ -13,7 +13,7 @@ mod caching;
 mod brep_signatures;
 mod config;
 mod content_hash;
-mod diagnostics;
+pub(crate) mod diagnostics;
 mod diagnostics_recording;
 mod diagnostics_checked;
 pub(crate) mod frame_parts;
@@ -41,7 +41,7 @@ pub use content_hash::FACETED_BREP_DEDUP_FACE_LIMIT;
 pub(crate) use diagnostics::ClassificationKind;
 pub use diagnostics::{
     aggregate_diagnostics, count_attributed_products, format_unsupported_breakdown, ClassificationStats,
-    ClassificationSummary, GeometryDiagnostics, HostOpeningDiagnostic, OpeningDiagnostic, OpeningKindDiag, ReasonCount,
+    BudgetRefusal, ClassificationSummary, GeometryDiagnostics, HostOpeningDiagnostic, OpeningDiagnostic, OpeningKindDiag, ReasonCount,
     HostBbox, RectFastSummary, WorstHost, GEOMETRY_DIAGNOSTICS_SCHEMA_VERSION, UNATTRIBUTED_PRODUCT_ID,
 };
 pub use item_dedup_cache::{ItemDedupCache, ItemDedupCacheState};
@@ -187,6 +187,7 @@ pub struct GeometryRouter {
     /// get cut?" from a console log alone. Drainable via
     /// [`Self::take_host_opening_diagnostics`].
     host_opening_diagnostics: RefCell<FxHashMap<u32, HostOpeningDiagnostic>>,
+    unchanged_rectangular_cuts: RefCell<FxHashMap<u32, bool>>,
     /// REQUEST-LOCAL rect_fast fast-path engagement counters. Accumulated per-cut
     /// by [`Self::record_rect_fast`] into THIS router (not a process-global), so a
     /// native server running concurrent geometry passes — each with its own router
@@ -264,6 +265,7 @@ impl GeometryRouter {
             csg_scope: CsgScopeState::default(),
             classification_stats: RefCell::new(ClassificationStats::default()),
             host_opening_diagnostics: RefCell::new(FxHashMap::default()),
+            unchanged_rectangular_cuts: RefCell::new(FxHashMap::default()),
             rect_fast_stats: RefCell::new(crate::rect_fast::RectFastStats::default()),
             layer_slice_diag: RefCell::new(Vec::new()),
             voids_consumed_hosts: RefCell::new(FxHashSet::default()),

@@ -492,6 +492,119 @@ canvas.addEventListener('mousemove', (e) => {
 });
 ```
 
+
+### Snapping on released geometry
+
+`raycastScene` and `raycastSceneMagnetic` test CPU mesh pieces. A host that
+releases them after GPU upload (to fit a very large model) can still measure and
+snap. It reads the pieces under the pointer back from its own storage, places
+them in the current model frame, and hands them over before the raycast:
+
+```typescript
+import type { MeshData } from '@ifc-lite/geometry';
+
+declare const pieces: MeshData[];            // read back from the host's own storage
+declare const x: number, y: number;          // canvas CSS pixels under the pointer
+const edgeLock = { edge: null, meshExpressId: null, lockStrength: 0 };
+
+const placed = pieces.map((mesh) => renderer.getScene().placeAppearanceSource!(mesh));
+renderer.setReadbackRaycastMeshes(placed, { x, y }); // tested beside resident pieces, for this ray only
+const result = renderer.raycastSceneMagnetic(x, y, edgeLock, {
+  snapOptions: { snapToVertices: true, snapToEdges: true, snapToFaces: true },
+});
+renderer.setReadbackRaycastMeshes(null);     // clear when the tool moves on
+console.log(result.snapTarget?.type);
+```
+
+The pieces follow the same hide/isolate and section-clip rules as resident ones.
+The renderer does not copy them, so the host keeps them alive while they are set.
+
+Pass the canvas point they were prepared for, `setReadbackRaycastMeshes(placed, { x, y })`.
+Then they answer only that ray under the current view, because a neighbourhood
+is not the whole scene. Check `readbackRaycastCovers(x, y)` before a raycast at a
+new point, and prepare again when it is false. Instanced occurrences read back as
+decoded shards are expanded with `materializeShardOccurrences(shard, modelIndex, keyPrefix)`,
+the same preparation an upload uses, then placed like flat pieces.
+
+### Rebuilding a released scene
+
+When the scene must be rebuilt (a content reload: realign, rebase, collaboration),
+a host that released CPU geometry cannot upload the arrays again. It first removes
+the old flat geometry with `scene.clearFlatGeometry()` (not `clear()`, which also
+destroys the instanced templates the rebuild keeps), then streams the arrays back
+from its own storage, one bounded batch at a time. A replay that rejects (a read
+failed) has already rolled back, so the host retries it like a non-complete one,
+if that reload is still current:
+
+```typescript
+import { replayReleasedGeometry } from '@ifc-lite/renderer';
+import type { MeshData } from '@ifc-lite/geometry';
+
+declare const storedSlices: string[];                            // the host's own stored batch keys
+declare function readBack(slice: string): Promise<MeshData[]>;  // reads one stored batch back
+declare const token: number, latest: () => number;               // the host's reload generation
+declare function retryLater(): void;
+
+async function* batches() {
+  for (const slice of storedSlices) yield await readBack(slice); // model-local, as stored
+}
+renderer.getScene().clearFlatGeometry(); // the old flat draw goes first; instanced templates stay
+try {
+  const result = await replayReleasedGeometry(renderer, batches(), { isCurrent: () => token === latest() });
+  if (result.status !== 'complete' && token === latest()) retryLater(); // cancelled or unavailable
+} catch {
+  if (token === latest()) retryLater(); // a read failed: the replay rolled back before rethrowing
+}
+```
+
+Each batch is uploaded through the ephemeral streaming path (GPU fragments only,
+no CPU pieces); the scene's bucket lookup still references each batch's meshes
+until the pass finalizes. The scene keeps per-entity
+bounds, so picking and framing still work, and it ends in the released state it
+started from. Replays of one scene run one at a time, each in its own pass:
+starting a newer replay does not supersede an earlier one by itself. The host
+makes the earlier replay's `isCurrent` return `false` when it starts the newer
+one; an earlier replay without `isCurrent` runs on and can still complete. A
+replay is all or nothing. Its entity bounds reach the scene only when it
+completes. One that errors, is cancelled, is superseded (its `isCurrent` turned false), fails to
+finalize or is interrupted by a device loss removes the fragments it uploaded
+and drops its bounds before returning, so replaying again never draws a batch
+twice. Picking and framing see a replay's bounds once it completes.
+
+### Device recovery of a released scene
+
+`recoverDevice()` restores an ordinary scene from its CPU pieces. A released
+scene has none, so it is refused with `cpu-geometry-released` unless the host
+registers a rebuild that puts the geometry back from its own storage:
+
+```typescript
+import { replayReleasedGeometry } from '@ifc-lite/renderer';
+import type { DecodedInstancedShard, MeshData } from '@ifc-lite/geometry';
+
+declare function storedFlatBatches(): AsyncIterable<MeshData[]>;            // the host's stored flat meshes
+declare function storedInstancedShards(): AsyncIterable<DecodedInstancedShard>; // and its stored instanced shards
+declare function modelIndexOf(shard: DecodedInstancedShard): number;          // the model each shard belongs to
+
+renderer.setReleasedSceneRebuild(async ({ device, pipeline, scene, instancedModelIndices, isCurrent, requestRender }) => {
+  const flat = await replayReleasedGeometry(
+    { getScene: () => scene, getGPUDevice: () => (isCurrent() ? device : null), getPipeline: () => pipeline, requestRender },
+    storedFlatBatches(), { isCurrent });
+  if (flat.status !== 'complete') return false;
+  for await (const shard of storedInstancedShards()) {
+    if (!instancedModelIndices.has(modelIndexOf(shard))) continue; // only templates the scene held
+    if (!isCurrent()) return false;
+    scene.addInstancedShard(device, shard, modelIndexOf(shard));
+  }
+  return true; // readiness is published only now
+});
+```
+
+The rebuild runs against the replacement device before the renderer reports
+ready. Model placements are kept; flat and instanced GPU state is reset first.
+Return `false` (or let `isCurrent()` go false) and the renderer stays lost with
+`scene-restore-failed`, so the host's recovery may retry. Pass `null` to refuse
+released scenes again.
+
 ### Magnetic Snap Configuration
 
 ```typescript
@@ -576,8 +689,16 @@ canvas.addEventListener('click', async (e) => {
 names the `IfcRepresentationItem` that particular surface was built from, so a host can
 drill from one pane of a curtain wall down to its own entity in the IFC source instead of
 stopping at the wall. It is the same value under the same name as `MeshData.geometryItemId`
-from `@ifc-lite/geometry`, and it is reported on both pick paths: the GPU pick pass, and
-the CPU raycast fallback that every model past the pick-mesh budget takes.
+from `@ifc-lite/geometry`, and it is reported on every pick route: the GPU pick pass over
+hydrated per-piece meshes (small models), the GPU pick pass over whole colour batches
+that models past the pick-mesh budget take, and the CPU raycast fallback.
+
+On the batch route the GPU reads only the entity from the vertex lane, so the renderer
+raycasts that one entity's retained CPU pieces along the same texel-centre ray to name
+the model and item. If that narrow raycast misses (a silhouette texel the f32 CPU test
+rounds the other way), the item is reported only when all of the entity's pieces agree on
+it. The hit point is the GPU's own: depth unprojected under the camera-relative frame the
+pass rasterised in.
 
 ```typescript
 canvas.addEventListener('click', async (e) => {
@@ -772,6 +893,17 @@ renderer.render({
   selectedIds
 });
 ```
+
+A colour batch holds many entities. When only some of them are hidden or
+isolated away, the batch is still drawn whole from its own GPU buffers, and
+each fragment looks its entity up in a GPU table of the hidden and isolated
+ids, which the colour, shadow and pick passes share. No subset of the batch is
+rebuilt from CPU geometry, so a visibility change uploads one small id table
+instead of new vertex buffers. `hiddenIds` and `isolatedIds` keep the
+semantics above: hiding wins, an empty isolation set hides everything, and
+`null` isolates nothing. X-Ray (`transparencyOverrides`, `ghostExceptIds`) and
+lens colour promotion can still split a batch into per-alpha subsets; those
+subsets hold only visible entities.
 
 ### Basket Isolation (Viewer App)
 

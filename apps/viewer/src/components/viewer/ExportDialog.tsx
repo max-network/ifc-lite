@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { createModelMutationView } from '@/utils/model-mutation-view';
+import { getOrCreateMutationView } from '@/sdk/adapters/mutation-view';
 import type { ExportFormat, ExportSurface } from '@/lib/analytics-export-events';
 import { modelDisplayLabels } from '@/lib/model-labels.js';
 import { stepExportProgress } from '@/lib/export/step-progress.js';
@@ -32,17 +32,17 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Download } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { toast } from '@/components/ui/toast';
-import { stepExportSummary } from '@/lib/export/step-export-summary';
+import { mergedExportSummary, stepExportSummary } from '@/lib/export/step-export-summary';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useViewerStore, countGeneratedTasks } from '@/store';
+import { hasGeorefEdits } from './step-export-source';
 import { useTranslation } from '@/i18n';
 import { resolveExportVisibility } from '@/store/exportVisibility';
 import { trackExportCompleted } from '@/lib/analytics';
 import { useOptionalExtensionHost } from '@/sdk/ExtensionHostProvider';
 import { ensureModelExportReady } from '@/services/desktop-export';
-import { MergedExporter, Ifc5Exporter, type ExportProgress } from '@ifc-lite/export';
-import { withInstancedMeshes } from '../../utils/instancedExport.js';
+import type { ExportProgress } from '@ifc-lite/export';
 import { downloadFile, modelExportFilename } from '@/lib/export/download';
 import { landXmlDownloadInput, landXmlIfcExportOutcome } from '@/lib/export/landXmlIfcDownload.js';
 import { landXmlExportPlan } from '@/lib/export/landXmlIfcPlan.js';
@@ -53,12 +53,13 @@ import { canExportRoomAsStep } from '@/lib/collab/room-step-export';
 import { roomMergeVisibility } from '@/lib/collab/room-merged-export';
 import { roomSymbolicSource } from '@/lib/collab/room-symbolic-source';
 import { canWriteIfcFromStores, listExportModels, resolveExportModel, stepSkipReason } from './export-model-selection';
-import { buildMergeInputs, emptyMergeRefusal, mergeSkipNotice, statedMergeSkips } from './export-merge-inputs';
+import { buildMergeInputs, emptyMergeRefusal, mergedModels, mergeSkipNotice, statedMergeSkips } from './export-merge-inputs';
 import { exportOutputInfo } from './export-output-format.js';
 import { activeChangesJsonMutations, exportChangesJson } from './export-changes-json.js';
 import { hasFilterableIfc5Properties } from '@/lib/export/ifc5-filterable-properties.js';
 import { hasRetainedSectionExport, RETAINED_EXACT_ONLY_REASON, hasRetainedShapeOnlyModel, RETAINED_SHAPE_ONLY_REASON } from '@/store/retainedGeometry';
 import { ExportDialogShell, type ExportDialogShellResult } from './ExportDialogShell';
+import { stepExportResult } from './export-step-result';
 import { ExportDialogScopeOptions } from './export-dialog-scope-options';
 import { ExportDialogSchemaOptions } from './export-dialog-schema-options';
 import { ExportDialogToggleOptions } from './export-dialog-toggle-options';
@@ -75,10 +76,8 @@ export function ExportDialog({ surface, trigger, initialChangesOnly = false }: E
   const activeModelId = useViewerStore((s) => s.activeModelId);
   const dirtyModels = useViewerStore((s) => s.dirtyModels);
   const getMutationView = useViewerStore((s) => s.getMutationView);
-  const registerMutationView = useViewerStore((s) => s.registerMutationView);
-  const getModifiedEntityCount = useViewerStore((s) => s.getModifiedEntityCount);
   // Subscribed so the pending-changes count refreshes while the dialog is open
-  // (getModifiedEntityCount / getMutationView are stable action refs). Schedule
+  // (getMutationView is a stable action ref). Schedule
   // edits don't bump mutationVersion, so the schedule fields are subscribed too.
   const mutationVersion = useViewerStore((s) => s.mutationVersion);
   const scheduleData = useViewerStore((s) => s.scheduleData);
@@ -179,18 +178,8 @@ export function ExportDialog({ surface, trigger, initialChangesOnly = false }: E
   // Ensure mutation view exists for selected model
   useEffect(() => {
     if (!selectedModel?.ifcDataStore || !selectedModelId) return;
-
-    // Check if mutation view already exists
-    let mutationView = getMutationView(selectedModelId);
-    if (mutationView) return;
-
-    // Create new mutation view with on-demand property extractor
-    const dataStore = selectedModel.ifcDataStore;
-    mutationView = createModelMutationView(dataStore, selectedModelId);
-
-    // Register the mutation view
-    registerMutationView(selectedModelId, mutationView);
-  }, [selectedModel, selectedModelId, getMutationView, registerMutationView]);
+    getOrCreateMutationView(useViewerStore, selectedModelId);
+  }, [selectedModel?.ifcDataStore, selectedModelId]);
 
   // Default schema to selected model's schema version
   useEffect(() => {
@@ -232,12 +221,7 @@ export function ExportDialog({ surface, trigger, initialChangesOnly = false }: E
       let count = getMutationView(selectedModelId)?.getModifiedEntityCount() ?? 0;
       // The single-model STEP export also applies the selected model's
       // georeferencing edits, so count them (+1) when present.
-      const gm = georefMutations.get(selectedModelId);
-      const hasGeoref = !!gm && (
-        (gm.projectedCRS && Object.keys(gm.projectedCRS).length > 0) ||
-        (gm.mapConversion && Object.keys(gm.mapConversion).length > 0)
-      );
-      if (hasGeoref) count += 1;
+      if (hasGeorefEdits(georefMutations.get(selectedModelId))) count += 1;
       // ...and it splices the schedule when the selected model owns it (or it's
       // unattributed with pending tasks) — the same gate spliceScheduleIntoExport
       // uses — so count those tasks too, matching what actually gets written.
@@ -250,9 +234,12 @@ export function ExportDialog({ surface, trigger, initialChangesOnly = false }: E
       }
       return count;
     }
-    return getModifiedEntityCount();
+    // A merged export writes only the models `buildMergeInputs` keeps: their overlay edits, and their georeferencing
+    // edits unless an IFC2X3 target cannot hold them. It splices no schedule (#10669).
+    return mergedModels(models).reduce((count, model) => count + (getMutationView(model.id)?.getModifiedEntityCount() ?? 0)
+      + (schema !== 'IFC2X3' && hasGeorefEdits(georefMutations.get(model.id)) ? 1 : 0), 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [exportScope, selectedModelId, getModifiedEntityCount, getMutationView, mutationVersion, scheduleData, scheduleIsEdited, scheduleSourceModelId, georefMutations]);
+  }, [exportScope, selectedModelId, getMutationView, mutationVersion, scheduleData, scheduleIsEdited, scheduleSourceModelId, georefMutations, models, schema]);
 
   /**
    * Resolve local (per-model) hidden/isolated expressIds for `modelId` from
@@ -335,7 +322,10 @@ export function ExportDialog({ surface, trigger, initialChangesOnly = false }: E
           model,
           dataStore: await ensureModelExportReady(model.id),
         })));
-        const { inputs: mergeInputs, portableByModel, skipped } = buildMergeInputs(hydratedModels, { applyMutations, getMutationView });
+        const { inputs: mergeInputs, portableByModel, skipped } = buildMergeInputs(hydratedModels, {
+          // georefMutations read at export time: this callback does not re-memoize on georef edits.
+          applyMutations, getMutationView, georefMutations: useViewerStore.getState().georefMutations,
+        });
         const refusal = emptyMergeRefusal(mergeInputs, t);
         if (refusal) { toast.error(refusal); return { success: false, message: refusal }; }
 
@@ -344,6 +334,8 @@ export function ExportDialog({ surface, trigger, initialChangesOnly = false }: E
           : { hidden: new Map<string, Set<number>>(), isolated: new Map<string, Set<number> | null>() };
 
         const prepared = await sectionMergeInputs(mergeInputs, visibility, schema, sectionExport.options);
+        // Loaded on use: the merged export is its own lazy chunk, off the startup bundle.
+        const { MergedExporter } = await import('@ifc-lite/export/merged-exporter');
         const mergedExporter = new MergedExporter(prepared.inputs);
         // Assemble the merged download off-heap so it does not materialise as
         // one contiguous Uint8Array on the JS heap.
@@ -372,15 +364,9 @@ export function ExportDialog({ surface, trigger, initialChangesOnly = false }: E
         // Named for the first model: `keep-first` makes its IfcProject the merged file's.
         downloadFile(result.content, modelExportFilename(mergeInputs[0]?.name ?? '', 'ifc', '_merged'), 'text/plain');
 
-        const skipNotice = mergeSkipNotice(skipped, t);
-        const msg = `Merged ${result.stats.modelCount} models, ${result.stats.totalEntityCount.toLocaleString()} entities`
-          + (result.stats.normalizedModelCount > 0
-            ? ` (${result.stats.normalizedModelCount} rescaled into the first model's unit)`
-            : '')
-          + (skipNotice ? `. ${skipNotice}` : '');
+        const msg = mergedExportSummary(result.stats, mergeSkipNotice(skipped, t), prepared.warnings.length > 0, t);
         exportedFormat = 'ifc';
-        toast.success(msg);
-        return { success: true, message: msg };
+        return stepExportResult(msg, [...prepared.warnings, ...result.stats.warnings], t);
       }
 
       if (!selectedModel) {
@@ -417,31 +403,6 @@ export function ExportDialog({ surface, trigger, initialChangesOnly = false }: E
         }
         const idOffset = federatedModel?.idOffset ?? 0;
 
-        // Include GPU-instanced occurrences (absent from geometryResult.meshes) so
-        // the USD/IFC5 export isn't missing them. GPU instancing stopped being
-        // primary-only on 2026-08-06 (#2255) — a federated model can carry
-        // instanced occurrences too — so scope by THIS model's
-        // `{ idOffset, maxExpressId }` bracket rather than an `idOffset === 0`
-        // gate, or a federation of N models would splice every other model's
-        // instanced entities into this one's export. `federatedModel` is
-        // undefined only for the legacy slot, which is provably the sole model
-        // loaded, so `null` (no filter) is correct there (#2865/#2878 follow-up).
-        const exportGeometry = selectedModel.geometryResult
-          ? withInstancedMeshes(
-              selectedModel.geometryResult,
-              federatedModel
-                ? { modelId: federatedModel.id, idOffset: federatedModel.idOffset ?? 0, maxExpressId: federatedModel.maxExpressId ?? 0 }
-                : null,
-            )
-          : selectedModel.geometryResult;
-
-        const exporter = new Ifc5Exporter(
-          selectedModel.ifcDataStore,
-          exportGeometry,
-          mutationView || undefined,
-          idOffset,
-        );
-
         // When changesOnly, restrict to mutated entities and force applyMutations
         let localHidden: Set<number> | undefined;
         let localIsolated: Set<number> | undefined;
@@ -465,16 +426,21 @@ export function ExportDialog({ surface, trigger, initialChangesOnly = false }: E
           effectiveVisibleOnly = true;
         }
 
-        const result = exporter.export({
-          includeGeometry: changesOnly ? false : includeGeometry,
-          includeProperties: true,
-          applyMutations: effectiveApplyMutations,
-          visibleOnly: effectiveVisibleOnly,
-          hiddenEntityIds: localHidden,
-          isolatedEntityIds: localIsolated,
-          onlyKnownProperties,
-          author: 'ifc-lite',
-          stripPathPrefix: roomExportPathPrefix(useViewerStore.getState(), selectedModelId), // room path -> file path, #4444
+        const { exportModelIfcx } = await import('@/lib/export/model-ifcx-export');
+        const result = await exportModelIfcx({
+          modelId: selectedModelId, dataStore: selectedModel.ifcDataStore,
+          geometryResult: selectedModel.geometryResult, mutationView: mutationView ?? undefined,
+          idOffset, maxExpressId: federatedModel ? federatedModel.maxExpressId ?? 0 : undefined, models: useViewerStore.getState().models, options: {
+            includeGeometry: changesOnly ? false : includeGeometry,
+            includeProperties: true,
+            applyMutations: effectiveApplyMutations,
+            visibleOnly: effectiveVisibleOnly,
+            hiddenEntityIds: localHidden,
+            isolatedEntityIds: localIsolated,
+            onlyKnownProperties,
+            author: 'ifc-lite',
+            stripPathPrefix: roomExportPathPrefix(useViewerStore.getState(), selectedModelId), // room path -> file path, #4444
+          },
         });
 
         const suffix = changesOnly ? '_changes' : (visibleOnly ? '_visible' : '_export');
@@ -525,8 +491,7 @@ export function ExportDialog({ surface, trigger, initialChangesOnly = false }: E
 
         const stepMsg = stepExportSummary({ entityCount: result.stats.entityCount, pendingChanges: modifiedCount, applyMutations, visibleOnly });
         exportedFormat = artifact.ext;
-        toast.success(stepMsg);
-        return { success: true, message: stepMsg };
+        return stepExportResult(stepMsg, result.stats.warnings, t);
       }
     } catch (error) {
       console.error('Export failed:', error);

@@ -8,6 +8,7 @@ import { registerOverlayCapacity } from './overlay-capacity.js';
 import { registerWorkflowArtifactInvalidation } from '../lib/flow/artifact-lifetime.js';
 import { createAppearanceSlice, type AppearanceSlice } from './slices/appearanceSlice.js';
 import { create } from 'zustand';
+import { scopedViewerStore } from './live-scope.js';
 import { createViewerActions, type ViewerActions } from './createViewerActions.js';
 import { createLoadingSlice, type LoadingSlice } from './slices/loadingSlice.js';
 import { createSelectionSlice, type SelectionSlice } from './slices/selectionSlice.js';
@@ -55,6 +56,8 @@ import { createChatSlice, type ChatSlice } from './slices/chatSlice.js';
 import { createCesiumSlice, type CesiumSlice } from './slices/cesiumSlice.js';
 import { createGlobePlacementSlice, type GlobePlacementSlice } from './slices/globePlacementSlice.js';
 import { createSolarSlice, type SolarSlice } from './slices/solarSlice.js';
+import { createSiteContextSlice, type SiteContextSlice } from './slices/siteContextSlice.js';
+import { createFloodCheckSlice, type FloodCheckSlice } from './slices/floodCheckSlice.js';
 import { createEnvironmentSlice, type EnvironmentSlice } from './slices/environmentSlice.js';
 import { createScheduleSlice, type ScheduleSlice } from './slices/scheduleSlice.js';
 import { createPlaybackSlice, type PlaybackSlice } from './slices/playbackSlice.js';
@@ -179,7 +182,7 @@ export type ViewerState = AppearanceSlice & LoadingSlice &
   ScriptSlice &
   ChatSlice &
   CesiumSlice & GlobePlacementSlice &
-  SolarSlice &
+  SolarSlice & SiteContextSlice & FloodCheckSlice &
   EnvironmentSlice &
   ScheduleSlice &
   PlaybackSlice &
@@ -245,6 +248,8 @@ const createViewerStore = () => create<ViewerState>()(withStoreChurnCounters(wit
   ...createCesiumSlice(...args),
   ...createGlobePlacementSlice(...args),
   ...createSolarSlice(...args),
+  ...createSiteContextSlice(...args),
+  ...createFloodCheckSlice(...args),
   ...createEnvironmentSlice(...args),
   ...createScheduleSlice(...args),
   ...createPlaybackSlice(...args),
@@ -285,4 +290,7 @@ export function getViewerStoreApi(): ViewerStoreApi {
   return store;
 }
 
-export const useViewerStore = getViewerStoreApi();
+// Hooks read the settled state outside a LiveViewerScope; the store API stays live (#10535).
+export const useViewerStore = scopedViewerStore(getViewerStoreApi());
+export { LiveViewerScope } from './live-scope.js';
+export { settledStoreOf } from './settled-store.js';

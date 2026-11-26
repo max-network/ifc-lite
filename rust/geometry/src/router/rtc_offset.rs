@@ -11,7 +11,7 @@ use crate::representation::{is_drawing_camera_annotation, product_shape, Select}
 use ifc_lite_core::{is_geometry_job, DecodedEntity, EntityDecoder, IfcType, RtcVerdict};
 
 mod mapped_vote;
-mod raw_coordinate;
+pub(in crate::router) mod raw_coordinate;
 
 impl GeometryRouter {
     /// Compute median-based RTC offset from sampled translations.
@@ -49,6 +49,9 @@ impl GeometryRouter {
     /// geometry vertex — infrastructure models (12d Model, Civil 3D) embed
     /// large world coordinates directly in Brep/tessellated geometry with an
     /// identity placement.
+    // Keep geometry probing out of the RTC record scan: refusal diagnostics in
+    // the probe must not enlarge the loop that filters every model record.
+    #[inline(never)]
     fn sample_element_translation(
         &self,
         entity: &DecodedEntity,

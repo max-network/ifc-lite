@@ -127,6 +127,9 @@ function makeHarness() {
         case 'getUniformBufferSize': return () => MESH_UNIFORM_BYTES;
         case 'getQuantizedPipelineVariant': return () => null;
         case 'getSelectionPipeline': return () => SELECTION;
+        // No batch highlight pipeline (#10264 S3): these tests pin the copies
+        // that stand in whenever the colour batches cannot draw the highlight.
+        case 'getBatchSelectionPipeline': return () => null;
         case 'getPipeline': return () => ({ label: 'opaque', getBindGroupLayout: () => ({}) });
         case 'opaquePipeline': return () => ({ label: 'opaque' });
         case 'getTransparentPipeline': return () => ({ label: 'transparent' });
@@ -254,7 +257,7 @@ describe('selecting an entity with a huge piece count (#9192)', () => {
       load(h, [piece(1, 0), ...entity(9, pieces)]);
       const first = frameCost(h, { selectedId: 9 });
       assert.equal(first.buffers, 3, `${pieces} pieces: one vertex, index and uniform buffer in total`);
-      assert.ok(first.bindGroups <= 2, `${pieces} pieces: one mesh bind group, and at most one frame-wide`);
+      assert.ok(first.bindGroups <= 3, `${pieces} pieces: one mesh bind group, and at most two frame-wide (the outline mask's colour-table group is built once)`);
       assert.equal(first.highlightDraws.length, 1, `${pieces} pieces: one highlight draw`);
 
       const next = frameCost(h, { selectedId: 9 });

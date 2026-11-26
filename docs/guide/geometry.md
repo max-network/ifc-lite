@@ -1003,6 +1003,12 @@ matching native admission-refusal semantics. Repeated reads and batches do not a
 record twice. These counters are separate from owned-producer refusal warnings
 and CSG failure diagnostics. They do not change which geometry is emitted.
 
+Pipeline diagnostics schema 2 counts `silentNoOps` using measured area and
+volume for clean rectangular cuts, matching geometry diagnostics schema 6.
+Both measurements must stay within 0.1% of the original. Pipeline schema 1
+and geometry schema 5 used equal triangle counts. Merging batches with both
+versions includes only measured batches in the new count.
+
 `omittedTypeRecords` (#8341) makes a different loss countable: a type product
 whose RepresentationMaps the scan can read, but whose own record the full
 decoder rejects (a syntax error in another attribute), cannot be meshed, so its
@@ -1023,7 +1029,7 @@ Rust callers can use
 `ifc_lite_processing::pipeline_diagnostics::PipelineDiagnosticsReport` via
 `Default` or `from_processing_stats`. It contains the original counters/timings,
 the two refusal counters and `omitted_type_records`, serialized as one flat object. The published
-`PipelineDiagnostics` v1 struct and its constructor remain available unchanged;
+`PipelineDiagnostics` struct and its constructor retain their original fields;
 the new report is non-exhaustive so future counters can be added without
 breaking struct literals. Inspection of the published `ifc-lite-processing`
 27.0.0 crate confirmed that directly adding fields or `#[non_exhaustive]` to
@@ -1068,3 +1074,12 @@ Third-party Tauri bridges do not expose this contract; select WASM with
 `preferNative: false`. Native Rust consumers use
 `ProcessingRequest::full_pass().skip_voids(true)` with the shared `process` API.
 This is independent of `OpeningFilterMode`, which also controls filling visibility.
+
+Geometry diagnostics report safety work limits separately from unsupported or
+failed items. `budgetRefusals` identifies the budget, `limit`, and `reached`
+(the demand including the refused attempt or list), the affected `productId`,
+`productType` and `GlobalId` when available, and the refused `sourceId`.
+The viewer console and CLI geometry reports show these refusals even in builds
+without observability. Unsupported/failed item counts exclude budget refusals.
+
+Representation work-budget diagnostics carry `totalBudgetRefusals` and at most sixteen `budgetRefusals` details. Each detail names its budget, limit, reached demand, source id and owning product (including type products and GlobalId where available). Identical refusals are counted once per router drain; suppressed representation policies remain suppressed. Retained transactions return their refusal directly rather than adding a second model-lifetime log. The Load Report marks budget-only loads as incomplete and lists known affected products.

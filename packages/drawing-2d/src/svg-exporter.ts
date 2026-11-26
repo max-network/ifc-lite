@@ -16,7 +16,8 @@ import type { Drawing2D, DrawingLine, DrawingPolygon, Point2D, Bounds2D } from '
 import { getLineStyle, PAPER_SIZES, COMMON_SCALES, type PaperSize, type DrawingScale } from './styles.js';
 import { computeTransform, scaleLabel, sheetFlipsY, transformPoint, type Transform2D } from './svg-transform.js';
 import { escapeXml, svgNum } from './svg-format.js';
-import { createHatchingLayer, createHatchPatternDefs } from './svg-hatch.js';
+import { createHatchingLayer } from './svg-hatch.js';
+import { createHatchPatternDefs } from './svg-hatch-patterns.js';
 import { createPlanLayers } from './plan/svg-plan-layers.js';
 import type { MaterialCategory } from './plan/material-hatch.js';
 import { applyDxfPlacement } from './dxf/convert.js';

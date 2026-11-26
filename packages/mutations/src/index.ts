@@ -67,3 +67,6 @@ export type { EntityOperation, EntityOperationEffect, EntityPreparationOptions, 
 
 export { snapshotOverlay, restoreOverlay, OverlaySourceMismatchError } from './overlay-snapshot.js';
 export type { OverlaySnapshotV1, OverlaySnapshotHistory, OverlaySnapshotOptions, OverlayRestoreOptions, OverlayRestoreResult } from './overlay-snapshot-types.js';
+
+export type { EntityChangeTracker } from './overlay-change-tracker.js';
+export { prepareMutationViewMerge } from './merge-overlay-state.js';
