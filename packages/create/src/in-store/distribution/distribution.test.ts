@@ -96,7 +96,9 @@ describe('addDistributionElementToStore', () => {
     expect(basin.attributes[8]).toBe('.WASHHANDBASIN.');
     const rep = entity(r.shapeRepId);
     expect(rep.attributes[2]).toBe('SolidModel');
-    const [cut, post] = listOf(rep.attributes[3]).map(ref);
+    const [wrapped, post] = listOf(rep.attributes[3]).map(ref);
+    expect(wrapped.type).toBe('IfcCsgSolid');
+    const cut = ref(wrapped.attributes[0]);
     expect(cut.type).toBe('IfcBooleanResult');
     expect(cut.attributes[0]).toBe('.DIFFERENCE.');
     expect(ref(cut.attributes[1]).type).toBe('IfcExtrudedAreaSolid');

@@ -193,8 +193,10 @@ function addSolidElement(editor: StoreEditor, anchor: SpatialAnchor, params: Sol
     params.RefDirection ? vec(params.RefDirection) : undefined,
   );
   const solids = params.Solids.map((solid) => emitSolid(editor, anchor, solid, op));
-  const type = solids.every((s) => s.boolean) ? 'CSG' : solids.some((s) => s.boolean) ? 'SolidModel' : 'SweptSolid';
-  const body = emitBody(editor, anchor, type, solids.map((s) => s.id));
+  const mixed = solids.some((s) => s.boolean) && !solids.every((s) => s.boolean);
+  const type = mixed ? 'SolidModel' : solids.every((s) => s.boolean) ? 'CSG' : 'SweptSolid';
+  const items = solids.map((s) => (mixed && s.boolean ? editor.addEntity('IfcCsgSolid', [`#${s.id}`]).expressId : s.id));
+  const body = emitBody(editor, anchor, type, items);
   return emitElement(editor, anchor, params, checked, placementId, body, params.Ports ?? [], op);
 }
 
