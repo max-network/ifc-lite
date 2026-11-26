@@ -41,6 +41,21 @@ describe('retireProductShape', () => {
     expect(shapeOf(second)).not.toBeNull();
   });
 
+  it('removes the solid, profile and placement records only the retired shape reached', async () => {
+    const { store, editor, first, second, shapeOf, exported } = await wallSession();
+    const count = (step: string, type: string) => step.match(new RegExp(`=${type}\\(`, 'g'))?.length ?? 0;
+    const before = exported();
+    const shape = shapeOf(first)!;
+    editor.removeEntity(first);
+    retireProductShape(store, editor, shape);
+    const after = exported();
+    for (const type of ['IFCEXTRUDEDAREASOLID', 'IFCRECTANGLEPROFILEDEF']) expect(count(after, type)).toBe(count(before, type) - 1);
+    expect(count(after, 'IFCAXIS2PLACEMENT2D')).toBeLessThan(count(before, 'IFCAXIS2PLACEMENT2D'));
+    expect(shapeOf(second)).not.toBeNull();
+    const reparsed = await new IfcParser().parseColumnar(new TextEncoder().encode(after).buffer, { disableWorkerScan: true });
+    expect(reparsed.entityIndex.byType.get('IFCWALL')).toHaveLength(1);
+  });
+
   it('keeps a shape another product still uses', async () => {
     const { store, editor, first, second, shapeOf } = await wallSession();
     const shape = shapeOf(first)!;
