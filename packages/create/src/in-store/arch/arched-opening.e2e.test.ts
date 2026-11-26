@@ -89,8 +89,7 @@ describe('arched openings', () => {
       const m = await model('IFC4', unit);
       const window = addHostedElementInStore(m.store, m.editor, m.wall, { kind: 'window', params: ROUND_WINDOW });
       expect(readOpeningHead(m.store, window.openingId, m.view)?.head).toEqual({ Shape: 'round' });
-      const curves = m.text().split('
-').filter((line) => line.includes('IFCINDEXEDPOLYCURVE'));
+      const curves = m.text().split('\n').filter((line) => line.includes('IFCINDEXEDPOLYCURVE'));
       return Math.max(...curves.map((curve) => (curve.match(/IFCARCINDEX/g) ?? []).length));
     };
     const metre = await arcs('METRE');
