@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { MutablePropertyView, StoreEditor, type MutationEntityRef, type MutationStoreShape } from '@ifc-lite/mutations';
 import type { SpatialAnchor, SpatialAnchorSchema } from '../anchor.js';
-import { addDistributionElementToStore, addFlowPathElementToStore } from './element.js';
+import { addDistributionElementToStore, addFlowPathElementToStore, addSolidElementToStore } from './element.js';
 import { connectPortsInStore } from './ports.js';
 import { addDistributionSystemToStore, assignToGroupInStore } from './system.js';
 
@@ -111,6 +111,30 @@ describe('addDistributionElementToStore', () => {
     const { editor, anchor } = setup();
     expect(() => addDistributionElementToStore(editor, anchor, { Type: 'IfcSpaceHeater', Position: [0, 0, 0], Solids: [{ Position: [0, 0, 0], Depth: 1 }] })).toThrow(/Outline or Radius/);
     expect(() => addDistributionElementToStore(editor, anchor, { Type: 'IfcSpaceHeater', Position: [0, 0, 0], Solids: [] })).toThrow(/at least one/);
+  });
+});
+
+describe('addSolidElementToStore', () => {
+  it('writes a built element or furniture from solids, with ports when given', () => {
+    const { editor, anchor, entity } = setup();
+    const chimney = addSolidElementToStore(editor, anchor, {
+      Type: 'IfcChimney', PredefinedType: 'NOTDEFINED', Name: 'Chimney', Position: [1, 1, 0],
+      Solids: [{ Outline: [[0, 0], [0.4, 0], [0.4, 0.4], [0, 0.4]], Position: [0, 0, 0], Depth: 9, Voids: [{ Radius: 0.08, Position: [0.2, 0.2, -0.1], Depth: 9.2 }] }],
+      Ports: [{ Location: [0.2, 0, 1.5], Direction: [0, -1, 0], FlowDirection: 'SINK', PredefinedType: 'DUCT', SystemType: 'EXHAUST' }],
+    });
+    expect(entity(chimney.elementId).type).toBe('IfcChimney');
+    expect(entity(chimney.elementId).attributes[8]).toBe('.NOTDEFINED.');
+    expect(entity(chimney.shapeRepId).attributes[2]).toBe('CSG');
+    expect(entity(chimney.portIds[0] ?? -1).attributes.slice(7)).toEqual(['.SINK.', '.DUCT.', '.EXHAUST.']);
+    const worktop = addSolidElementToStore(editor, anchor, { Type: 'IfcSystemFurnitureElement', PredefinedType: 'WORKSURFACE', Position: [0, 0, 0.86], Solids: [{ Outline: [[0, 0], [2, 0], [2, 0.6], [0, 0.6]], Position: [0, 0, 0], Depth: 0.04 }] });
+    expect(entity(worktop.elementId).type).toBe('IfcSystemFurnitureElement');
+    expect(worktop.portIds).toEqual([]);
+    expect(worktop.nestsRelId).toBeNull();
+  });
+
+  it('refuses what is not an element', () => {
+    const { editor, anchor } = setup();
+    expect(() => addSolidElementToStore(editor, anchor, { Type: 'IfcBuildingStorey', Position: [0, 0, 0], Solids: [{ Radius: 1, Position: [0, 0, 0], Depth: 1 }] })).toThrow(/IfcElement/);
   });
 });
 
