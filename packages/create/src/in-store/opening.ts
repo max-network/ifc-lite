@@ -33,7 +33,7 @@ import {
   ifcElementHeader,
   ownerHistoryRef,
 } from './_emit-helpers.js';
-import { archedOpeningPath } from './arch/arched-outline.js';
+import { nativeArchedOpeningPath } from './arch/arched-outline.js';
 import { headRise, type OpeningHead } from './arch/opening-head.js';
 import { circlePath, emitPathProfile } from './arch/profile-path.js';
 
@@ -185,7 +185,7 @@ function wallOpeningGeometry(editor: StoreEditor, host: HostAnchor, params: Open
     [1, 0, 0],
   );
   const profileId = params.Head
-    ? emitPathProfile(editor, host.schema, archedOpeningPath({ width, height, rise: toNativeLength(host, headRise(params.Head, params.Width, params.Height, op)) }))
+    ? emitPathProfile(editor, host.schema, nativeArchedOpeningPath(host, { width: params.Width, height: params.Height, rise: headRise(params.Head, params.Width, params.Height, op) }))
     : emitRectangleProfile(editor, width, height, 0, height / 2);
   const solidId = emitExtrudedSolid(editor, profileId, cutDepth);
   return { placementId, profileId, solidId, cutDepth };

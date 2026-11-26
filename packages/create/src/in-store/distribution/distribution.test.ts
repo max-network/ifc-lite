@@ -7,7 +7,7 @@ import { MutablePropertyView, StoreEditor, type MutationEntityRef, type Mutation
 import type { SpatialAnchor, SpatialAnchorSchema } from '../anchor.js';
 import { addDistributionElementToStore, addFlowPathElementToStore, addSolidElementToStore, emitRectangularSweep } from './element.js';
 import { connectPortsInStore } from './ports.js';
-import { addDistributionSystemToStore, assignToGroupInStore } from './system.js';
+import { addDistributionSystemToStore, assignToGroupInStore, assignToProductInStore } from './system.js';
 
 const listOf = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 
@@ -200,5 +200,27 @@ describe('distribution systems and connections', () => {
     expect(entity(link).attributes.slice(4)).toEqual([`#${a.portIds[1]}`, `#${b.portIds[0]}`, null]);
     expect(() => connectPortsInStore(editor, anchor, { RelatingPort: 7, RelatedPort: 7 })).toThrow(/itself/);
     expect(() => assignToGroupInStore(editor, anchor, { GroupId: system.systemId, ObjectIds: [] })).toThrow(/at least one/);
+  });
+
+  it('writes a circuit aggregated into its system and assigned to the port that feeds it', () => {
+    const { editor, anchor, entity } = setup();
+    const board = addDistributionElementToStore(editor, anchor, {
+      Type: 'IfcElectricDistributionBoard', PredefinedType: 'DISTRIBUTIONBOARD', Position: [0, 0, 1], Solids: [{ Outline: [[0, 0], [0.5, 0], [0.5, 0.1], [0, 0.1]], Position: [0, 0, 0], Depth: 0.8 }],
+      Ports: [{ Location: [0.25, 0.05, 0.8], Direction: [0, 0, 1], FlowDirection: 'SOURCE', PredefinedType: 'CABLE', SystemType: 'ELECTRICAL' }],
+    });
+    const system = addDistributionSystemToStore(editor, anchor, { Name: 'Electrical', PredefinedType: 'ELECTRICAL', ServicedBuildings: [40] });
+    const circuit = addDistributionSystemToStore(editor, anchor, { Type: 'IfcDistributionCircuit', Name: 'F1', LongName: 'Sockets', PredefinedType: 'ELECTRICAL', PartOf: system.systemId });
+    expect(entity(circuit.systemId).type).toBe('IfcDistributionCircuit');
+    expect(entity(circuit.systemId).attributes.slice(2)).toEqual(['F1', null, null, 'Sockets', '.ELECTRICAL.']);
+    expect(circuit.servicesRelId).toBeNull();
+    const aggregates = entity(circuit.aggregatesRelId ?? -1);
+    expect(aggregates.type).toBe('IfcRelAggregates');
+    expect(aggregates.attributes.slice(4)).toEqual([`#${system.systemId}`, [`#${circuit.systemId}`]]);
+    expect(system.aggregatesRelId).toBeNull();
+    const fed = assignToProductInStore(editor, anchor, { ProductId: board.portIds[0] ?? -1, ObjectIds: [circuit.systemId] });
+    expect(entity(fed).type).toBe('IfcRelAssignsToProduct');
+    expect(entity(fed).attributes.slice(4)).toEqual([[`#${circuit.systemId}`], null, `#${board.portIds[0]}`]);
+    expect(() => addDistributionSystemToStore(editor, anchor, { Type: 'IfcWall', Name: 'x' })).toThrow(/not an IfcDistributionSystem/);
+    expect(() => assignToProductInStore(editor, anchor, { ProductId: 7, ObjectIds: [] })).toThrow(/at least one/);
   });
 });
