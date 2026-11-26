@@ -47,13 +47,15 @@ export interface DistributionSolidParams {
   Voids?: readonly DistributionSolidParams[];
 }
 
-export interface DistributionElementInStoreParams extends DistributionElementHeader {
+export interface SolidElementInStoreParams extends DistributionElementHeader {
   Position: readonly [number, number, number];
   Axis?: readonly [number, number, number];
   RefDirection?: readonly [number, number, number];
   Solids: readonly DistributionSolidParams[];
   Ports?: readonly DistributionPortParams[];
 }
+
+export type DistributionElementInStoreParams = SolidElementInStoreParams;
 
 export interface DistributionElementBuildResult {
   elementId: number;
@@ -113,9 +115,9 @@ function elementValues(params: DistributionElementHeader, anchor: SpatialAnchor,
   };
 }
 
-function checkedHeader(anchor: SpatialAnchor, params: DistributionElementHeader, op: string) {
+function checkedHeader(anchor: SpatialAnchor, params: DistributionElementHeader, op: string, supertype = 'IfcDistributionElement') {
   const registry = distributionRegistry(anchor, op);
-  if (!conformsTo(registry, params.Type, 'IfcDistributionElement')) throw new Error(`${op}: ${params.Type} is not an IfcDistributionElement in ${registry.name}`);
+  if (!conformsTo(registry, params.Type, supertype)) throw new Error(`${op}: ${params.Type} is not an ${supertype} in ${registry.name}`);
   const values = elementValues(params, anchor, null, null);
   schemaEntityAttributes(registry, params.Type, values, op);
   return { registry, globalId: values.GlobalId };
@@ -231,11 +233,10 @@ function emitSolid(editor: StoreEditor, anchor: SpatialAnchor, solid: Distributi
   return { id, boolean: voids.length > 0 };
 }
 
-export function addDistributionElementToStore(editor: StoreEditor, anchor: SpatialAnchor, params: DistributionElementInStoreParams): DistributionElementBuildResult {
-  const op = 'addDistributionElementToStore';
+function addSolidElement(editor: StoreEditor, anchor: SpatialAnchor, params: SolidElementInStoreParams, op: string, supertype: string): DistributionElementBuildResult {
   assertFinitePoint3({ Position: vec(params.Position) }, op);
   if (params.Solids.length === 0) throw new Error(`${op}: Solids needs at least one solid`);
-  const checked = checkedHeader(anchor, params, op);
+  const checked = checkedHeader(anchor, params, op, supertype);
   const placementId = emitLocalPlacement(
     editor,
     anchor.storeyPlacementId,
@@ -244,7 +245,17 @@ export function addDistributionElementToStore(editor: StoreEditor, anchor: Spati
     params.RefDirection ? vec(params.RefDirection) : undefined,
   );
   const solids = params.Solids.map((solid) => emitSolid(editor, anchor, solid, op));
-  const type = solids.every((s) => s.boolean) ? 'CSG' : solids.some((s) => s.boolean) ? 'SolidModel' : 'SweptSolid';
-  const body = emitBody(editor, anchor, type, solids.map((s) => s.id));
+  const mixed = solids.some((s) => s.boolean) && !solids.every((s) => s.boolean);
+  const type = mixed ? 'SolidModel' : solids.every((s) => s.boolean) ? 'CSG' : 'SweptSolid';
+  const items = solids.map((s) => (mixed && s.boolean ? editor.addEntity('IfcCsgSolid', [`#${s.id}`]).expressId : s.id));
+  const body = emitBody(editor, anchor, type, items);
   return emitElement(editor, anchor, params, checked, placementId, body, params.Ports ?? [], op);
+}
+
+export function addDistributionElementToStore(editor: StoreEditor, anchor: SpatialAnchor, params: DistributionElementInStoreParams): DistributionElementBuildResult {
+  return addSolidElement(editor, anchor, params, 'addDistributionElementToStore', 'IfcDistributionElement');
+}
+
+export function addSolidElementToStore(editor: StoreEditor, anchor: SpatialAnchor, params: SolidElementInStoreParams): DistributionElementBuildResult {
+  return addSolidElement(editor, anchor, params, 'addSolidElementToStore', 'IfcElement');
 }
