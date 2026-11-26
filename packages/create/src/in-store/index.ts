@@ -323,3 +323,6 @@ export type { StructuralMemberConnectionOptions } from './_structural-connection
 
 export { getFootprintRoofPlaneParts } from './roof-plane-parts.js';
 export { retireProductShape } from './product-shape-retire.js';
+export { addFlowPathElementToStore, addDistributionElementToStore, type DistributionElementHeader, type FlowPathElementInStoreParams, type DistributionSolidParams, type DistributionElementInStoreParams, type DistributionElementBuildResult } from './distribution/element.js';
+export { addDistributionPortsToStore, connectPortsInStore, type DistributionPortParams, type DistributionPortsInStoreParams, type DistributionPortsBuildResult, type PortConnectionInStoreParams, type PortFlowDirection } from './distribution/ports.js';
+export { addDistributionSystemToStore, assignToGroupInStore, type DistributionSystemInStoreParams, type DistributionSystemBuildResult, type GroupAssignmentInStoreParams } from './distribution/system.js';
