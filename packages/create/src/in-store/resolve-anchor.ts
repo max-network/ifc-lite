@@ -84,6 +84,20 @@ export function resolveBodyContextId(store: IfcDataStore, view?: MutableProperty
   return reader.contextId('body', reader.rootContextId());
 }
 
+type RegistryFamily = 'IFC2X3' | 'IFC4' | 'IFC4X3';
+
+const schemaNameSnapshots = new Map<RegistryFamily, SchemaEntityNameSnapshot>();
+
+/** One name snapshot per generated registry, shared by every reader instead of rebuilt per reader. */
+function sharedSchemaNames(schema: string | undefined): SchemaEntityNameSnapshot {
+  const family: RegistryFamily = schema === 'IFC2X3' ? schema : schema === 'IFC4X3' || schema === 'IFC5' ? 'IFC4X3' : 'IFC4';
+  const known = schemaNameSnapshots.get(family);
+  if (known) return known;
+  const snapshot = createSchemaEntityNameSnapshot(getSchemaRegistryForVersion(family));
+  schemaNameSnapshots.set(family, snapshot);
+  return snapshot;
+}
+
 export class AnchorEntityReader {
   private readonly extractor: EntityExtractor | null;
 
@@ -152,8 +166,7 @@ export class AnchorEntityReader {
     const source = ref && this.extractor ? this.extractor.extractEntity(ref) : null;
     const entity = created ?? source;
     if (!entity) return null;
-    const schema = this.store?.schemaVersion;
-    this.schemaNames ??= createSchemaEntityNameSnapshot(getSchemaRegistryForVersion(schema === 'IFC2X3' ? schema : schema === 'IFC4X3' || schema === 'IFC5' ? 'IFC4X3' : 'IFC4'));
+    this.schemaNames ??= sharedSchemaNames(this.store?.schemaVersion);
     return resolveEffectiveEntityRecord(entity, {
       retype: this.view?.getEntityTypeMutation(id)?.newType,
       named: this.view?.getAttributeMutationsForEntity(id).map(({ name, value }) => [name, value] as const) ?? [],
