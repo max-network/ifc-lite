@@ -44,7 +44,7 @@ import { analyticsDrawingControlOperations } from './analytics-drawing-controls'
 import { publishDrawingExportFrame } from '@/lib/drawing/export-view-frame';
 import { dxfPlaneDrawingMapper } from '@/hooks/dxfReferencePlane';
 import { computeAnimationFrame } from '@/components/viewer/schedule/schedule-animator';
-import { measuredDimensionValue } from '@/store/slices/drawing2DDimensions';
+import { linearDimensionLength } from '@ifc-lite/drawing-2d';
 import { blankDocument } from '@/lib/document/presets';
 import { modelOverviewDashboard } from '@/lib/charts/presets';
 import { listRunDefinition, listRunModels } from '@/lib/lists/run-provenance';
@@ -408,9 +408,9 @@ describe('native analytics operations (#10525 deeper automation)', () => {
     await run('drawing.addPolygon', { points: [[0, 0], [3, 0], [3, 4], [0, 4]] }, viewerContext);
     assert.notEqual(useViewerStore.getState().polygonArea2DResults[0].id, useViewerStore.getState().polygonArea2DResults[1].id);
     const dimension = await run<{ id: string }>('drawing.addDimension', { a: [0, 0], b: [3, 4], offset: 1, orientation: 'aligned', text: '<>' }, viewerContext);
-    assert.equal(measuredDimensionValue(useViewerStore.getState().dimensions2D[0]), 5);
+    assert.equal(linearDimensionLength(useViewerStore.getState().dimensions2D[0]), 5);
     await run('drawing.moveMarkup', { id: dimension.id, kind: 'dimension', position: [10, 10] }, viewerContext);
-    assert.equal(measuredDimensionValue(useViewerStore.getState().dimensions2D[0]), 5);
+    assert.equal(linearDimensionLength(useViewerStore.getState().dimensions2D[0]), 5);
     await run('drawing.dimensionHistory', { action: 'undo' }, viewerContext); assert.deepEqual(useViewerStore.getState().dimensions2D[0].a, { x: 0, y: 0 });
   });
 

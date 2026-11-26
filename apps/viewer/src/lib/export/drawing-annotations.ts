@@ -7,7 +7,7 @@ import { effectiveMetadataRecord, type IfcDataStore } from '@ifc-lite/parser';
 import { DRAWING_MARKUP_OBJECTTYPE } from '@ifc-lite/create';
 import { loadPersistedDimensions, isDimensionOnPlane, type Dimension2D } from '@/store/slices/drawing2DDimensions';
 import type { DrawnSectionPlane, Measure2DResult, TagAnnotation2D, Point2D } from '@/store/slices/drawing2DSlice';
-import { dimensionGraphics } from '@/lib/drawing2d-markup/dimension-graphics';
+import { linearDimensionGraphics } from '@ifc-lite/drawing-2d';
 import { customPlaneCenter } from '@/store/slices/section-plane-center';
 
 import { removeEmbeddedDrawingMarkup } from '@/lib/drawing2d-markup/drawing-markup-embedded-sweep';
@@ -200,7 +200,7 @@ export function prepareDrawingAnnotations(store: IfcDataStore, view: MutableProp
         label = `${Math.hypot(item.value.end.x - item.value.start.x, item.value.end.y - item.value.start.y).toFixed(2)} m`;
         at = { x: (item.value.start.x + item.value.end.x) / 2, y: (item.value.start.y + item.value.end.y) / 2 };
       } else if (item.kind === 'dimension') {
-        const graphics = dimensionGraphics(item.value, { paperScale: input.paperScale, format: metres => `${metres.toFixed(2)} m` });
+        const graphics = linearDimensionGraphics(item.value, { paperScale: input.paperScale, format: metres => `${metres.toFixed(2)} m` });
         for (const [a, b] of [...graphics.lines, ...graphics.ticks]) line(a, b);
         label = graphics.text.value; at = graphics.text.at; angle = graphics.text.angle;
       } else {
