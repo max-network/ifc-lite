@@ -5,7 +5,7 @@
 import type { StoreEditor } from '@ifc-lite/mutations';
 import { assertFinitePoint3, completePlacementAxes } from '../../ifc-creator-math.js';
 import { toNativeLength, toNativePoint2, toNativePoint3, type SpatialAnchor } from '../anchor.js';
-import { assertPositiveFinite, emitLocalPlacement, emitPolygonProfile, emitRelContainedInSpatialStructure, ownerHistoryRef, productGuid } from '../_emit-helpers.js';
+import { assertPositiveFinite, emitLocalPlacement, emitPolygonProfile, emitRectangleProfile, emitRectangleRingProfile, emitRelContainedInSpatialStructure, ownerHistoryRef, productGuid } from '../_emit-helpers.js';
 import { conformsTo, schemaEntityAttributes } from '../schema-attributes.js';
 import { addDistributionPortsToStore, distributionRegistry, type DistributionPortParams, type PortFlowDirection, type Vec3 } from './ports.js';
 
@@ -21,13 +21,20 @@ export interface DistributionElementHeader {
 
 export interface FlowPathElementInStoreParams extends DistributionElementHeader {
   Path: ReadonlyArray<readonly [number, number, number]>;
-  OuterDiameter: number;
+  OuterDiameter?: number;
   InnerDiameter?: number;
+  Section?: RectangularSectionParams;
   PortType?: string;
   SystemType?: string;
   FlowDirections?: readonly [PortFlowDirection, PortFlowDirection];
   PortNames?: readonly [string, string];
   Ports?: boolean;
+}
+
+export interface RectangularSectionParams {
+  Width: number;
+  Height: number;
+  WallThickness?: number;
 }
 
 export interface DistributionSolidParams {
@@ -70,12 +77,28 @@ function pathOf(params: FlowPathElementInStoreParams, op: string): Vec3[] {
   for (let i = 1; i < path.length; i++) {
     if (Math.hypot(...sub(path[i], path[i - 1])) <= 1e-9) throw new Error(`${op}: Path[${i - 1}] and Path[${i}] must be distinct points`);
   }
-  assertPositiveFinite([params.OuterDiameter], `${op}: OuterDiameter must be a finite positive number`);
+  return path;
+}
+
+type FlowSection = { kind: 'round'; outer: number; inner?: number } | { kind: 'rectangular'; section: RectangularSectionParams };
+
+function checkedRectangle(section: RectangularSectionParams, op: string): RectangularSectionParams {
+  if (!(section.Width > 0 && section.Height > 0 && Number.isFinite(section.Width) && Number.isFinite(section.Height))) throw new Error(`${op}: Section Width and Height must be finite positive numbers`);
+  const wall = section.WallThickness;
+  if (wall !== undefined && !(wall > 0 && wall * 2 < Math.min(section.Width, section.Height))) throw new Error(`${op}: Section WallThickness must be positive and less than half of Width and Height`);
+  return section;
+}
+
+function sectionOf(params: FlowPathElementInStoreParams, op: string): FlowSection {
+  if ((params.OuterDiameter === undefined) === (params.Section === undefined)) throw new Error(`${op}: give either OuterDiameter or Section`);
+  if (params.Section !== undefined) return { kind: 'rectangular', section: checkedRectangle(params.Section, op) };
+  const outer = params.OuterDiameter ?? 0;
+  assertPositiveFinite([outer], `${op}: OuterDiameter must be a finite positive number`);
   if (params.InnerDiameter !== undefined) {
     assertPositiveFinite([params.InnerDiameter], `${op}: InnerDiameter must be a finite positive number`);
-    if (params.InnerDiameter >= params.OuterDiameter) throw new Error(`${op}: InnerDiameter must be less than OuterDiameter`);
+    if (params.InnerDiameter >= outer) throw new Error(`${op}: InnerDiameter must be less than OuterDiameter`);
   }
-  return path;
+  return { kind: 'round', outer, inner: params.InnerDiameter };
 }
 
 function elementValues(params: DistributionElementHeader, anchor: SpatialAnchor, placement: string | null, shape: string | null): Record<string, unknown> {
@@ -126,18 +149,14 @@ function emitElement(
 export function addFlowPathElementToStore(editor: StoreEditor, anchor: SpatialAnchor, params: FlowPathElementInStoreParams): DistributionElementBuildResult {
   const op = 'addFlowPathElementToStore';
   const path = pathOf(params, op);
+  const section = sectionOf(params, op);
   const checked = checkedHeader(anchor, params, op);
   const origin = path[0];
   const local = path.map((p) => sub(p, origin));
   const placementId = emitLocalPlacement(editor, anchor.storeyPlacementId, toNativePoint3(anchor, origin), [0, 0, 1], [1, 0, 0]);
-  const points = local.map((p) => editor.addEntity('IfcCartesianPoint', [toNativePoint3(anchor, p)]).expressId);
-  const directrix = editor.addEntity('IfcPolyline', [points.map((id) => `#${id}`)]).expressId;
-  const solid = editor.addEntity('IfcSweptDiskSolid', schemaEntityAttributes(checked.registry, 'IfcSweptDiskSolid', {
-    Directrix: `#${directrix}`,
-    Radius: toNativeLength(anchor, params.OuterDiameter / 2),
-    InnerRadius: params.InnerDiameter === undefined ? undefined : toNativeLength(anchor, params.InnerDiameter / 2),
-  }, op)).expressId;
-  const body = emitBody(editor, anchor, 'AdvancedSweptSolid', [solid]);
+  const body = section.kind === 'rectangular'
+    ? emitBody(editor, anchor, 'SweptSolid', emitRectangularSweep(editor, anchor, local, section.section))
+    : emitBody(editor, anchor, 'AdvancedSweptSolid', [emitSweptDisk(editor, anchor, checked.registry, local, section.outer, section.inner, op)]);
   const last = local.length - 1;
   const [startFlow, endFlow] = params.FlowDirections ?? ['NOTDEFINED', 'NOTDEFINED'];
   const [startName, endName] = params.PortNames ?? ['Start', 'End'];
@@ -159,6 +178,39 @@ function emitAxis(editor: StoreEditor, anchor: SpatialAnchor, position: Vec3, ax
   const z = axes ? `#${editor.addEntity('IfcDirection', [axes.Axis]).expressId}` : null;
   const x = axes ? `#${editor.addEntity('IfcDirection', [axes.RefDirection]).expressId}` : null;
   return editor.addEntity('IfcAxis2Placement3D', [`#${point}`, z, x]).expressId;
+}
+
+function emitSweptDisk(editor: StoreEditor, anchor: SpatialAnchor, registry: ReturnType<typeof distributionRegistry>, path: readonly Vec3[], outer: number, inner: number | undefined, op: string): number {
+  const points = path.map((p) => editor.addEntity('IfcCartesianPoint', [toNativePoint3(anchor, p)]).expressId);
+  const directrix = editor.addEntity('IfcPolyline', [points.map((id) => `#${id}`)]).expressId;
+  return editor.addEntity('IfcSweptDiskSolid', schemaEntityAttributes(registry, 'IfcSweptDiskSolid', {
+    Directrix: `#${directrix}`,
+    Radius: toNativeLength(anchor, outer / 2),
+    InnerRadius: inner === undefined ? undefined : toNativeLength(anchor, inner / 2),
+  }, op)).expressId;
+}
+
+const VERTICAL = 1 - 1e-9;
+
+export function emitRectangularSweep(editor: StoreEditor, anchor: SpatialAnchor, path: ReadonlyArray<readonly [number, number, number]>, section: RectangularSectionParams): number[] {
+  const op = 'emitRectangularSweep';
+  checkedRectangle(section, op);
+  const width = toNativeLength(anchor, section.Width);
+  const height = toNativeLength(anchor, section.Height);
+  const up = editor.addEntity('IfcDirection', [[0, 0, 1]]).expressId;
+  return path.slice(1).flatMap((end, i) => {
+    const start = vec(path[i]);
+    const along = sub(vec(end), start);
+    const length = Math.hypot(...along);
+    if (length <= 1e-9) return [];
+    const axis: Vec3 = [along[0] / length, along[1] / length, along[2] / length];
+    const flat = Math.hypot(axis[0], axis[1]);
+    const across: Vec3 = Math.abs(axis[2]) > VERTICAL ? [1, 0, 0] : [-axis[1] / flat || 0, axis[0] / flat || 0, 0];
+    const profile = section.WallThickness === undefined
+      ? emitRectangleProfile(editor, width, height)
+      : emitRectangleRingProfile(editor, width, height, toNativeLength(anchor, section.WallThickness));
+    return [editor.addEntity('IfcExtrudedAreaSolid', [`#${profile}`, `#${emitAxis(editor, anchor, start, axis, across)}`, `#${up}`, toNativeLength(anchor, length)]).expressId];
+  });
 }
 
 function emitSolid(editor: StoreEditor, anchor: SpatialAnchor, solid: DistributionSolidParams, op: string): { id: number; boolean: boolean } {
